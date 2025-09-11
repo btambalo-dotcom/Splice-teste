@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Editar Registro{% endblock %}
+{% block content %}
+<h1>Editar Registro</h1>
+<form method="post">
+  <label>Nome do dispositivo</label>
+  <input type="text" name="device_name" value="{{ rec['device_name'] }}" required>
+  <label>Número de fusões</label>
+  <input type="number" name="fusion_count" min="0" step="1" value="{{ rec['fusion_count'] }}" required>
+  <div style="margin-top:12px;">
+    <button class="btn" type="submit">Salvar</button>
+    <a class="btn secondary" href="{{ url_for('view_record', record_id=rec['id']) }}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

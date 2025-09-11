@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Meu Relatório{% endblock %}
+{% block content %}
+<h1>Meu Relatório</h1>
+
+<form method="get" action="{{ url_for('my_reports') }}">
+  <div style="display:grid; grid-template-columns: repeat(4, minmax(140px,1fr)); gap:12px; max-width:980px;">
+    <div>
+      <label>Início</label>
+      <input type="date" name="start" value="{{ start }}">
+    </div>
+    <div>
+      <label>Fim</label>
+      <input type="date" name="end" value="{{ end }}">
+    </div>
+    <div>
+      <label>Dispositivo (contém)</label>
+      <input type="text" name="device" value="{{ device or '' }}" placeholder="Ex.: OTE-">
+    </div>
+    <div style="align-self:end;">
+      <button class="btn" type="submit">Filtrar</button>
+    </div>
+  </div>
+</form>
+
+<form method="post" action="{{ url_for('my_photos_zip') }}">
+  <input type="hidden" name="start" value="{{ start }}">
+  <input type="hidden" name="end" value="{{ end }}">
+  <input type="hidden" name="device" value="{{ device or '' }}">
+  <button class="btn secondary" type="submit">Baixar Fotos (ZIP)</button>
+</form>
+
+<p style="margin-top:12px;">
+  <a class="btn secondary" href="{{ url_for('my_reports_csv', start=start, end=end, device=device) }}" target="_blank">Exportar CSV</a>
+  <a class="btn" href="{{ url_for('my_reports_xlsx', start=start, end=end, device=device) }}" target="_blank">Baixar XLSX</a>
+</p>
+
+<h2>Gráficos</h2>
+<div style="max-width:980px;">
+  <canvas id="chartByDay" height="120"></canvas>
+</div>
+<div style="max-width:980px; margin-top:18px;">
+  <canvas id="chartByCum" height="120"></canvas>
+</div>
+<div style="max-width:980px; margin-top:18px;">
+  <canvas id="chartByDevice" height="140"></canvas>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+async function loadCharts() {
+  const params = new URLSearchParams(window.location.search);
+  const res = await fetch(`/my/reports_data.json?${params.toString()}`);
+  const data = await res.json();
+
+  const byDayLabels = data.by_day.map(x => x.date);
+  const byDayValues = data.by_day.map(x => x.sum);
+  const byCumValues = data.by_day.map(x => x.cum || 0);
+
+  const ctx1 = document.getElementById('chartByDay').getContext('2d');
+  new Chart(ctx1, {
+    type: 'line',
+    data: { labels: byDayLabels, datasets: [{ label: 'Fusões por dia', data: byDayValues }] },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+
+  const ctxCum = document.getElementById('chartByCum').getContext('2d');
+  new Chart(ctxCum, {
+    type: 'line',
+    data: { labels: byDayLabels, datasets: [{ label: 'Fusões acumuladas', data: byCumValues }] },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+
+  const byDeviceLabels = data.by_device.map(x => x.device_name);
+  const byDeviceValues = data.by_device.map(x => x.sum);
+  const ctx2 = document.getElementById('chartByDevice').getContext('2d');
+  new Chart(ctx2, {
+    type: 'bar',
+    data: { labels: byDeviceLabels, datasets: [{ label: 'Fusões por dispositivo', data: byDeviceValues }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false }
+  });
+}
+loadCharts();
+</script>
+
+<h2>Totais</h2>
+<p><strong>Soma de fusões:</strong> {{ total_fusions }}</p>
+
+<h2>Dispositivos (soma por dispositivo)</h2>
+{% if devices %}
+  <table class="table">
+    <tr><th>Dispositivo</th><th>Registros</th><th>Fusões (soma)</th></tr>
+    {% for d in devices %}
+      <tr>
+        <td><a href="{{ url_for('my_device_detail', device_name=d.device_name, start=start, end=end) }}">{{ d.device_name }}</a></td>
+        <td>{{ d.registros }}</td>
+        <td>{{ d.fusoes }}</td>
+      </tr>
+    {% endfor %}
+  </table>
+{% else %}
+  <p>Nenhum dispositivo no filtro.</p>
+{% endif %}
+
+<h2>Detalhes</h2>
+{% if rows %}
+  <table class="table">
+    <tr><th>ID</th><th>Dispositivo</th><th>Fusões</th><th>Criado em</th><th>Ações</th></tr>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.id }}</td>
+        <td><a href="{{ url_for('my_device_detail', device_name=r.device_name, start=start, end=end) }}">{{ r.device_name }}</a></td>
+        <td>{{ r.fusion_count }}</td>
+        <td>{{ r.created_at }}</td>
+        <td>
+          <a class="btn" href="{{ url_for('view_record', record_id=r.id) }}">Ver</a>
+          <a class="btn secondary" href="{{ url_for('edit_record', record_id=r.id) }}">Editar</a>
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+{% else %}
+  <p>Sem registros para o filtro selecionado.</p>
+{% endif %}
+
+<p style="margin-top:16px;"><a class="btn secondary" href="{{ url_for('dashboard') }}">Voltar</a></p>
+{% endblock %}
