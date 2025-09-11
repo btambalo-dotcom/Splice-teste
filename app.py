@@ -77,8 +77,8 @@ def admin_required(view):
     from functools import wraps
     @wraps(view)
     def wrapped(*args, **kwargs):
-if "user_id" not in session:
-    return redirect(url_for("login"))
+        if "user_id" not in session:
+            return redirect(url_for("login"))
         if not session.get("is_admin"):
             flash("Acesso restrito ao administrador.", "error")
             return redirect(url_for("dashboard"))
