@@ -1,15 +1,15 @@
-{% extends "base.html" %}
-{% block title %}Editar Registro{% endblock %}
+{% extends 'base.html' %}
 {% block content %}
-<h1>Editar Registro</h1>
+<h4>Editar registro</h4>
 <form method="post">
-  <label>Nome do dispositivo</label>
-  <input type="text" name="device_name" value="{{ rec['device_name'] }}" required>
-  <label>Número de fusões</label>
-  <input type="number" name="fusion_count" min="0" step="1" value="{{ rec['fusion_count'] }}" required>
-  <div style="margin-top:12px;">
-    <button class="btn" type="submit">Salvar</button>
-    <a class="btn secondary" href="{{ url_for('view_record', record_id=rec['id']) }}">Cancelar</a>
+  <div class="mb-3"><label class="form-label">Dispositivo</label><input class="form-control" name="device_name" value="{{ rec.device_name }}" required></div>
+  <div class="mb-3"><label class="form-label">Nº de fusões</label><input class="form-control" type="number" name="fusion_count" value="{{ rec.fusion_count }}"></div>
+  <div class="mb-3">
+    <label class="form-label">Mapa</label>
+    <select name="map_id" class="form-select">
+      {% for m in assigned_maps %}<option value="{{ m.id }}" {% if rec.map_id==m.id %}selected{% endif %}>{{ m.title }}</option>{% endfor %}
+    </select>
   </div>
+  <button class="btn btn-primary">Salvar</button>
 </form>
 {% endblock %}

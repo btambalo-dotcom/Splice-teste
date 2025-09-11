@@ -1,15 +1,10 @@
-{% extends "base.html" %}
-{% block title %}Cadastrar{% endblock %}
+{% extends 'base.html' %}
+{% block title %}Cadastrar admin{% endblock %}
 {% block content %}
-<h1>Criar Conta</h1>
+<h3>Primeiro acesso</h3>
 <form method="post">
-  <label>Usuário</label>
-  <input type="text" name="username" required>
-  <label>Senha</label>
-  <input type="password" name="password" required>
-  <div style="margin-top:12px;">
-    <button class="btn" type="submit">Criar conta</button>
-    <a class="btn secondary" href="{{ url_for('login') }}">Já tenho conta</a>
-  </div>
+  <div class="mb-3"><label class="form-label">Usuário</label><input class="form-control" name="username"></div>
+  <div class="mb-3"><label class="form-label">Senha</label><input class="form-control" type="password" name="password"></div>
+  <button class="btn btn-primary">Criar admin</button>
 </form>
 {% endblock %}

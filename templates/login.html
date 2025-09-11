@@ -1,15 +1,11 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 {% block title %}Entrar{% endblock %}
 {% block content %}
-<h1>Entrar</h1>
+<h3>Entrar</h3>
 <form method="post">
-  <label>Usuário</label>
-  <input type="text" name="username" required>
-  <label>Senha</label>
-  <input type="password" name="password" required>
-  <div style="margin-top:12px;">
-    <button class="btn" type="submit">Entrar</button>
-    <a class="btn secondary" href="{{ url_for('register') }}">Cadastrar</a>
-  </div>
+  <div class="mb-3"><label class="form-label">Usuário</label><input class="form-control" name="username"></div>
+  <div class="mb-3"><label class="form-label">Senha</label><input class="form-control" type="password" name="password"></div>
+  <button class="btn btn-primary">Entrar</button>
+  <a class="btn btn-outline-secondary" href="{{ url_for('register') }}">Cadastrar</a>
 </form>
 {% endblock %}

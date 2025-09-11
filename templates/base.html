@@ -1,37 +1,28 @@
 <!doctype html>
 <html lang="pt-br">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Splice Admin Pro{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Splice Admin Pro{% endblock %}</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
 </head>
 <body>
-  <header>
-    <div style="display:flex;justify-content:space-between;align-items:center;">
-      <div><strong>Splice Admin Pro</strong></div>
-      <nav>
-        {% if session.get('user_id') %}
-          <span>Olá, {{ session.get('username') }}{% if session.get('is_admin') %} (admin){% endif %}</span>
-          <a href="{{ url_for('dashboard') }}">Dashboard</a>
-          <a href="{{ url_for('new_record') }}">Novo Registro</a>
-          <a href="{{ url_for('my_reports') }}">Meu Relatório</a>
-          {% if session.get('is_admin') %}
-            <a href="{{ url_for('admin_home') }}">Admin</a>
-          {% endif %}
-          <a href="{{ url_for('logout') }}">Sair</a>
-        {% else %}
-          <a href="{{ url_for('login') }}">Entrar</a>
-          <a href="{{ url_for('register') }}">Cadastrar</a>
-        {% endif %}
-      </nav>
+<nav class="navbar navbar-expand-lg navbar-dark">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="{{ url_for('dashboard') }}">Splice Admin Pro</a>
+    <div class="d-flex">
+      {% if session.get('user_id') %}
+        <a class="nav-link text-white me-3" href="{{ url_for('logout') }}">Sair</a>
+      {% endif %}
     </div>
-  </header>
-  <div class="container">
-    {% for cat, msg in (get_flashed_messages(with_categories=True) or []) %}
-      <div class="flash {{ cat }}">{{ msg }}</div>
-    {% endfor %}
-    {% block content %}{% endblock %}
   </div>
+</nav>
+<div class="container py-3">
+  {% for m,c in get_flashed_messages(with_categories=True) %}
+    <div class="alert alert-{{ c }}">{% if m %}{{ m }}{% endif %}</div>
+  {% endfor %}
+  {% block content %}{% endblock %}
+</div>
 </body>
 </html>

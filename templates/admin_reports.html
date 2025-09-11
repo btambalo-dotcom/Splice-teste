@@ -1,99 +1,43 @@
-{% extends "base.html" %}
-{% block title %}Admin - Relatórios{% endblock %}
+{% extends 'base.html' %}
 {% block content %}
-<h1>Relatórios</h1>
+<h4>Relatórios (Admin)</h4>
+<form class="row g-2 mb-3" method="get">
+  <div class="col-md-3"><label class="form-label">De</label><input class="form-control" type="date" name="start" value="{{ request.args.get('start','') }}"></div>
+  <div class="col-md-3"><label class="form-label">Até</label><input class="form-control" type="date" name="end" value="{{ request.args.get('end','') }}"></div>
+  <div class="col-md-3">
+    <label class="form-label">Usuário</label>
+    <select class="form-select" name="user_id">
+      <option value="">Todos</option>
+      {% for u in users %}<option value="{{ u.id }}" {% if request.args.get('user_id')==u.id|string %}selected{% endif %}>{{ u.username }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-3 d-flex align-items-end"><button class="btn btn-primary w-100">Filtrar</button></div>
+  <div class="col-12 form-check mt-2">
+    <input class="form-check-input" type="checkbox" id="launched_only" name="launched_only" value="1"
+           {% if request.args.get('launched_only')=='1' %}checked{% endif %}>
+    <label class="form-check-label" for="launched_only">Somente lançados</label>
+  </div>
 
-<form method="get" action="{{ url_for('admin_reports') }}">
-  <div style="display:grid; grid-template-columns: repeat(4, minmax(140px,1fr)); gap:12px; max-width:900px;">
-    <div>
-      <label>Início</label>
-      <input type="date" name="start" value="{{ start }}">
-    </div>
-    <div>
-      <label>Fim</label>
-      <input type="date" name="end" value="{{ end }}">
-    </div>
-    <div>
-      <label>Usuário</label>
-      <select name="user_id">
-        <option value="">-- Todos --</option>
-        {% for u in users %}
-          <option value="{{ u.id }}" {% if selected_user_id == u.id %}selected{% endif %}>{{ u.username }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div style="align-self:end;">
-      <button class="btn" type="submit">Filtrar</button>
-    </div>
+  <div class="col-12 form-check mt-1">
+    <input class="form-check-input" type="checkbox" id="not_launched_only" name="not_launched_only" value="1"
+           {% if request.args.get('not_launched_only')=='1' %}checked{% endif %}>
+    <label class="form-check-label" for="not_launched_only">Somente NÃO lançados</label>
   </div>
 </form>
-
-<p style="margin-top:12px;">
-  <a class="btn secondary" href="{{ url_for('admin_reports_csv', start=start, end=end, user_id=selected_user_id) }}" target="_blank">Exportar CSV (filtrado)</a>
-</p>
-<p style="margin-top:8px;">
-  <a class="btn" href="{{ url_for('admin_reports_xlsx', start=start, end=end, user_id=selected_user_id) }}" target="_blank">Baixar XLSX (filtrado)</a>
-</p>
-
-<h2>Totais</h2>
-<p><strong>Soma de fusões:</strong> {{ total_fusions }}</p>
-
-<h2>Dispositivos (soma por dispositivo)</h2>
-{% if devices %}
-  <table class="table">
-    <tr><th>Dispositivo</th><th>Registros</th><th>Fusões (soma)</th></tr>
-    {% for d in devices %}
-      <tr>
-        <td>{{ d.device_name }}</td>
-        <td>{{ d.registros }}</td>
-        <td>{{ d.fusoes }}</td>
-      </tr>
-    {% endfor %}
-  </table>
-{% else %}
-  <p>Nenhum dispositivo no filtro.</p>
-{% endif %}
-
-<h2>Totais por Usuário (no período)</h2>
-<p>
-  <a class="btn secondary" href="{{ url_for('admin_reports_users_csv', start=start, end=end, user_id=selected_user_id) }}" target="_blank">
-    Exportar CSV (por usuário)
-  </a>
-</p>
-{% if users_summary %}
-  <table class="table">
-    <tr><th>User ID</th><th>Usuário</th><th>Dispositivos distintos</th><th>Registros</th><th>Fusões (soma)</th></tr>
-    {% for u in users_summary %}
-      <tr>
-        <td>{{ u.id }}</td>
-        <td>{{ u.username }}</td>
-        <td>{{ u.devices }}</td>
-        <td>{{ u.registros }}</td>
-        <td>{{ u.fusoes }}</td>
-      </tr>
-    {% endfor %}
-  </table>
-{% else %}
-  <p>Sem dados para este período/filtro.</p>
-{% endif %}
-
-<h2>Detalhes</h2>
-{% if rows %}
-  <table class="table">
-    <tr><th>ID</th><th>Usuário</th><th>Dispositivo</th><th>Fusões</th><th>Criado em</th></tr>
-    {% for r in rows %}
-      <tr>
-        <td>{{ r.id }}</td>
-        <td>{{ r.username }}</td>
-        <td>{{ r.device_name }}</td>
-        <td>{{ r.fusion_count }}</td>
-        <td>{{ r.created_at }}</td>
-      </tr>
-    {% endfor %}
-  </table>
-{% else %}
-  <p>Sem registros para o filtro selecionado.</p>
-{% endif %}
-
-<p style="margin-top:16px;"><a class="btn secondary" href="{{ url_for('admin_home') }}">Voltar</a></p>
+<a class="btn btn-outline-secondary btn-sm mb-2" href="{{ url_for('admin_reports_csv', **request.args) }}">Baixar CSV</a>
+<a class="btn btn-outline-primary btn-sm mb-2 ms-2" href="{{ url_for('admin_reports_photos_zip', **request.args) }}">Baixar fotos (ZIP)</a>
+<table class="table table-sm">
+<thead><tr><th>Data</th><th>Usuário</th><th>Dispositivo</th><th>Fusões</th><th>Mapa</th></tr></thead>
+<tbody>
+{% for r in records %}
+<tr>
+  <td>{{ r.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+  <td>{{ (users|selectattr('id','equalto',r.user_id)|first).username if users else r.user_id }}</td>
+  <td><a href="{{ url_for('admin_device_detail', rid=r.id) }}">{{ r.device_name }}</a> {% if r.launched %}<span class="badge bg-success">LANÇADO</span>{% endif %}</td>
+  <td>{{ r.fusion_count }}</td>
+  <td>{% if r.map_id %}{{ (r.map_id) }}{% endif %}</td>
+</tr>
+{% else %}<tr><td colspan="5">Sem resultados.</td></tr>{% endfor %}
+</tbody>
+</table>
 {% endblock %}
