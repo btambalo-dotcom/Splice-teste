@@ -1,0 +1,23 @@
+
+services:
+  - type: web
+    name: splice-admin-pro
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: SECRET_KEY
+        value: 91bc42eedf78ad7cd0123b1c1a083160
+      - key: MAX_CONTENT_LENGTH_MB
+        value: "20"
+      - key: FORCE_RESET_ADMIN
+        value: "0"
+      - key: RESET_ADMIN_TOKEN
+        value: cc95b103763c8a1c
+      - key: NEW_ADMIN_PASSWORD
+        value: nova123
+    disk:
+      name: uploads-disk
+      mountPath: /opt/render/project/src/static/uploads
+      sizeGB: 1
