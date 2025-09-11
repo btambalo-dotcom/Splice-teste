@@ -201,7 +201,7 @@ def edit_record(record_id):
     rec = db.execute("SELECT id, user_id, device_name, fusion_count FROM records WHERE id = ?", (record_id,)).fetchone()
     if not rec or rec["user_id"] != session["user_id"]:
         abort(404)
-    if request.method == "POST"]:
+    if request.method == "POST":
         device_name = request.form.get("device_name", "").strip()
         fusion_count = request.form.get("fusion_count", "").strip()
         try:
@@ -393,7 +393,7 @@ def admin_home():
 @admin_required
 def admin_users():
     db = get_db()
-    if request.method == "POST"]:
+    if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
         is_admin = 1 if request.form.get("is_admin") == "on" else 0
@@ -433,7 +433,7 @@ def admin_reset_password(user_id):
     if not user:
         flash("Usuário não encontrado.", "error")
         return redirect(url_for("admin_users"))
-    if request.method == "POST"]:
+    if request.method == "POST":
         p1 = request.form.get("password", "").strip()
         p2 = request.form.get("password2", "").strip()
         if not p1 or not p2 or p1 != p2:
