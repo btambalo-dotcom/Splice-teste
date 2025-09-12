@@ -1,5 +1,4 @@
-{% extends 'base.html' %}
-{% block content %}
+{% extends 'base.html' %}{% block content %}
 <h4>Relatórios (Admin)</h4>
 <form class="row g-2 mb-3" method="get">
   <div class="col-md-3"><label class="form-label">De</label><input class="form-control" type="date" name="start" value="{{ request.args.get('start','') }}"></div>
@@ -36,9 +35,6 @@
       <td>{{ r.fusion_count }}</td>
       <td>{% if r.map_id %}{{ maps.get(r.map_id, r.map_id) }}{% endif %}</td>
     </tr>
-  {% else %}
-    <tr><td colspan="5">Sem resultados.</td></tr>
-  {% endfor %}
+  {% else %}<tr><td colspan="5">Sem resultados.</td></tr>{% endfor %}
   </tbody>
-</table>
-{% endblock %}
+</table>{% endblock %}

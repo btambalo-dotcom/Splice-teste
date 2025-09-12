@@ -1,5 +1,4 @@
-{% extends 'base.html' %}
-{% block content %}
+{% extends 'base.html' %}{% block content %}
 <h4>{{ rec.device_name }} {% if rec.launched %}<span class="badge bg-success">LANÇADO</span>{% endif %}</h4>
 <p><b>Fusões:</b> {{ rec.fusion_count }} | <b>Data:</b> {{ rec.created_at }}</p>
 {% if wmap %}<p><b>Mapa:</b> {{ wmap.title }} — <a href="{{ url_for('download_map', map_id=wmap.id) }}">Baixar PDF</a></p>{% endif %}

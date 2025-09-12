@@ -1,32 +1,15 @@
 <!doctype html>
-<html lang="pt-br">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<html lang="pt-br"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}Splice Admin Pro{% endblock %}</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
-</head>
-<body>
-<nav class="navbar navbar-dark bg-dark">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="{{ url_for('dashboard') }}">Splice Admin Pro</a>
-    <div class="d-flex">
-      {% if session.get('user_id') %}
-        <a class="nav-link text-white" href="{{ url_for('logout') }}">Sair</a>
-      {% endif %}
-    </div>
-  </div>
-</nav>
+</head><body>
+<nav class="navbar navbar-dark bg-dark"><div class="container-fluid">
+<a class="navbar-brand" href="{{ url_for('dashboard') }}">Splice Admin Pro</a>
+<div class="d-flex">{% if session.get('user_id') %}<a class="nav-link text-white" href="{{ url_for('logout') }}">Sair</a>{% endif %}</div>
+</div></nav>
 <div class="container py-3">
-  {% with messages = get_flashed_messages(with_categories=True) %}
-    {% if messages %}
-      {% for cat,msg in messages %}
-        <div class="alert alert-{{ cat }}">{{ msg }}</div>
-      {% endfor %}
-    {% endif %}
-  {% endwith %}
-  {% block content %}{% endblock %}
-</div>
-</body>
-</html>
+{% with messages = get_flashed_messages(with_categories=True) %}{% if messages %}{% for c,m in messages %}<div class="alert alert-{{ c }}">{{ m }}</div>{% endfor %}{% endif %}{% endwith %}
+{% block content %}{% endblock %}
+</div></body></html>

@@ -1,5 +1,4 @@
-{% extends 'base.html' %}
-{% block content %}
+{% extends 'base.html' %}{% block content %}
 <h4>Dispositivo: {{ rec.device_name }}</h4>
 <p><b>Usuário:</b> {{ user.username }} | <b>Fusões:</b> {{ rec.fusion_count }} | <b>Lançado:</b> {{ 'Sim' if rec.launched else 'Não' }}</p>
 {% if wmap %}<p><b>Mapa:</b> {{ wmap.title }} — <a href="{{ url_for('download_map', map_id=wmap.id) }}">Baixar PDF</a></p>{% endif %}
@@ -12,5 +11,4 @@
       <img class="photo" src="{{ url_for('static', filename='uploads/' ~ p.filename) }}">
     </a>
   {% else %}<p>Sem fotos.</p>{% endfor %}
-</div>
-{% endblock %}
+</div>{% endblock %}
