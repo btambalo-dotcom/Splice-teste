@@ -2,10 +2,10 @@
 {% block title %}Entrar{% endblock %}
 {% block content %}
 <h3>Entrar</h3>
-<form method="post">
-  <div class="mb-3"><label class="form-label">Usuário</label><input class="form-control" name="username"></div>
-  <div class="mb-3"><label class="form-label">Senha</label><input class="form-control" type="password" name="password"></div>
+<form method="post" class="card card-body">
+  <div class="mb-3"><label class="form-label">Usuário</label><input class="form-control" name="username" required></div>
+  <div class="mb-3"><label class="form-label">Senha</label><input class="form-control" type="password" name="password" required></div>
   <button class="btn btn-primary">Entrar</button>
-  <a class="btn btn-outline-secondary" href="{{ url_for('register') }}">Cadastrar</a>
+  <a class="btn btn-outline-secondary mt-2" href="{{ url_for('register') }}">Cadastrar (só 1ª vez)</a>
 </form>
 {% endblock %}

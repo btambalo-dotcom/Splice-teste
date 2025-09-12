@@ -6,7 +6,7 @@
 <div class="d-flex flex-wrap">
   {% for p in photos %}
     <a href="{{ url_for('static', filename='uploads/' ~ p.filename) }}" target="_blank">
-      <img src="{{ url_for('static', filename='uploads/' ~ p.filename) }}" style="max-width:160px;margin:6px;border-radius:6px">
+      <img class="photo" src="{{ url_for('static', filename='uploads/' ~ p.filename) }}">
     </a>
   {% else %}<p>Sem fotos.</p>{% endfor %}
 </div>

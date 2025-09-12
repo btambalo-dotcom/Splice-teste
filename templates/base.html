@@ -8,20 +8,24 @@
 <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-dark">
+<nav class="navbar navbar-dark bg-dark">
   <div class="container-fluid">
     <a class="navbar-brand" href="{{ url_for('dashboard') }}">Splice Admin Pro</a>
     <div class="d-flex">
       {% if session.get('user_id') %}
-        <a class="nav-link text-white me-3" href="{{ url_for('logout') }}">Sair</a>
+        <a class="nav-link text-white" href="{{ url_for('logout') }}">Sair</a>
       {% endif %}
     </div>
   </div>
 </nav>
 <div class="container py-3">
-  {% for m,c in get_flashed_messages(with_categories=True) %}
-    <div class="alert alert-{{ c }}">{% if m %}{{ m }}{% endif %}</div>
-  {% endfor %}
+  {% with messages = get_flashed_messages(with_categories=True) %}
+    {% if messages %}
+      {% for cat,msg in messages %}
+        <div class="alert alert-{{ cat }}">{{ msg }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
   {% block content %}{% endblock %}
 </div>
 </body>

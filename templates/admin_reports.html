@@ -13,31 +13,32 @@
   </div>
   <div class="col-md-3 d-flex align-items-end"><button class="btn btn-primary w-100">Filtrar</button></div>
   <div class="col-12 form-check mt-2">
-    <input class="form-check-input" type="checkbox" id="launched_only" name="launched_only" value="1"
-           {% if request.args.get('launched_only')=='1' %}checked{% endif %}>
+    <input class="form-check-input" type="checkbox" id="launched_only" name="launched_only" value="1" {% if request.args.get('launched_only')=='1' %}checked{% endif %}>
     <label class="form-check-label" for="launched_only">Somente lançados</label>
   </div>
-
   <div class="col-12 form-check mt-1">
-    <input class="form-check-input" type="checkbox" id="not_launched_only" name="not_launched_only" value="1"
-           {% if request.args.get('not_launched_only')=='1' %}checked{% endif %}>
+    <input class="form-check-input" type="checkbox" id="not_launched_only" name="not_launched_only" value="1" {% if request.args.get('not_launched_only')=='1' %}checked{% endif %}>
     <label class="form-check-label" for="not_launched_only">Somente NÃO lançados</label>
   </div>
 </form>
-<a class="btn btn-outline-secondary btn-sm mb-2" href="{{ url_for('admin_reports_csv', **request.args) }}">Baixar CSV</a>
-<a class="btn btn-outline-primary btn-sm mb-2 ms-2" href="{{ url_for('admin_reports_photos_zip', **request.args) }}">Baixar fotos (ZIP)</a>
+<div class="mb-2">
+  <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_reports_csv', **request.args) }}">Baixar CSV</a>
+  <a class="btn btn-outline-primary btn-sm ms-2" href="{{ url_for('admin_reports_photos_zip', **request.args) }}">Baixar fotos (ZIP)</a>
+</div>
 <table class="table table-sm">
-<thead><tr><th>Data</th><th>Usuário</th><th>Dispositivo</th><th>Fusões</th><th>Mapa</th></tr></thead>
-<tbody>
-{% for r in records %}
-<tr>
-  <td>{{ r.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
-  <td>{{ (users|selectattr('id','equalto',r.user_id)|first).username if users else r.user_id }}</td>
-  <td><a href="{{ url_for('admin_device_detail', rid=r.id) }}">{{ r.device_name }}</a> {% if r.launched %}<span class="badge bg-success">LANÇADO</span>{% endif %}</td>
-  <td>{{ r.fusion_count }}</td>
-  <td>{% if r.map_id %}{{ (r.map_id) }}{% endif %}</td>
-</tr>
-{% else %}<tr><td colspan="5">Sem resultados.</td></tr>{% endfor %}
-</tbody>
+  <thead><tr><th>Data</th><th>Usuário</th><th>Dispositivo</th><th>Fusões</th><th>Mapa</th></tr></thead>
+  <tbody>
+  {% for r in records %}
+    <tr>
+      <td>{{ r.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+      <td>{{ (users|selectattr('id','equalto',r.user_id)|first).username if users else r.user_id }}</td>
+      <td><a href="{{ url_for('admin_device_detail', rid=r.id) }}">{{ r.device_name }}</a> {% if r.launched %}<span class="badge bg-success">LANÇADO</span>{% endif %}</td>
+      <td>{{ r.fusion_count }}</td>
+      <td>{% if r.map_id %}{{ maps.get(r.map_id, r.map_id) }}{% endif %}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5">Sem resultados.</td></tr>
+  {% endfor %}
+  </tbody>
 </table>
 {% endblock %}

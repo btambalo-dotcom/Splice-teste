@@ -6,29 +6,28 @@
   <div class="col-md-3"><label class="form-label">Até</label><input class="form-control" type="date" name="end" value="{{ request.args.get('end','') }}"></div>
   <div class="col-md-3 d-flex align-items-end"><button class="btn btn-primary w-100">Filtrar</button></div>
   <div class="col-12 form-check mt-2">
-    <input class="form-check-input" type="checkbox" id="launched_only" name="launched_only" value="1"
-           {% if request.args.get('launched_only')=='1' %}checked{% endif %}>
+    <input class="form-check-input" type="checkbox" id="launched_only" name="launched_only" value="1" {% if request.args.get('launched_only')=='1' %}checked{% endif %}>
     <label class="form-check-label" for="launched_only">Somente lançados</label>
   </div>
-
   <div class="col-12 form-check mt-1">
-    <input class="form-check-input" type="checkbox" id="not_launched_only" name="not_launched_only" value="1"
-           {% if request.args.get('not_launched_only')=='1' %}checked{% endif %}>
+    <input class="form-check-input" type="checkbox" id="not_launched_only" name="not_launched_only" value="1" {% if request.args.get('not_launched_only')=='1' %}checked{% endif %}>
     <label class="form-check-label" for="not_launched_only">Somente NÃO lançados</label>
   </div>
 </form>
 <a class="btn btn-outline-secondary btn-sm mb-2" href="{{ url_for('my_reports_csv', **request.args) }}">Baixar CSV</a>
 <table class="table table-sm">
-<thead><tr><th>Data</th><th>Dispositivo</th><th>Fusões</th><th>Mapa</th></tr></thead>
-<tbody>
-{% for r in records %}
-<tr>
-  <td>{{ r.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
-  <td>{{ r.device_name }} {% if r.launched %}<span class="badge bg-success">LANÇADO</span>{% endif %}</td>
-  <td>{{ r.fusion_count }}</td>
-  <td>{% if r.map_id %}{{ maps.get(r.map_id, r.map_id) }}{% endif %}</td>
-</tr>
-{% else %}<tr><td colspan="4">Sem resultados.</td></tr>{% endfor %}
-</tbody>
+  <thead><tr><th>Data</th><th>Dispositivo</th><th>Fusões</th><th>Mapa</th></tr></thead>
+  <tbody>
+  {% for r in records %}
+    <tr>
+      <td>{{ r.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+      <td>{{ r.device_name }} {% if r.launched %}<span class="badge bg-success">LANÇADO</span>{% endif %}</td>
+      <td>{{ r.fusion_count }}</td>
+      <td>{% if r.map_id %}{{ maps.get(r.map_id, r.map_id) }}{% endif %}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="4">Sem resultados.</td></tr>
+  {% endfor %}
+  </tbody>
 </table>
 {% endblock %}
