@@ -16,7 +16,7 @@
     <tr>
       <td>{{ f.name }}</td>
       <td>{{ (f.size/1024)|round(1) }} KB</td>
-      <td>{{ f.mtime|int }}</td>
+      <td>{{ f.mtime|int | datetime }}</td>
       <td>
         <a class="btn" href="{{ url_for('admin_backup_download', name=f.name) }}">Baixar</a>
         <form method="post" action="{{ url_for('admin_backup_delete', name=f.name) }}" style="display:inline" onsubmit="return confirm('Remover {{ f.name }}?')">
