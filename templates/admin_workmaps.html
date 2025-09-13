@@ -14,6 +14,7 @@
 <h3>Arquivos enviados</h3>
 <table class="table">
   <tr><th>ID</th><th>Título</th><th>Arquivo</th><th>Baixar</th></tr>
+  {% if maps %}
   {% for m in maps %}
   <tr>
     <td>{{ m.id }}</td>
@@ -22,6 +23,9 @@
     <td><a href="{{ url_for('workmap_download', wm_id=m.id) }}" target="_blank">PDF</a></td>
   </tr>
   {% endfor %}
+{% else %}
+  <tr><td colspan="4">Nenhum mapa enviado ainda.</td></tr>
+{% endif %}
 </table>
 
 <h3>Permissões de Acesso</h3>

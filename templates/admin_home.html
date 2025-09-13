@@ -2,11 +2,11 @@
 {% block title %}Admin - Início{% endblock %}
 {% block content %}
 <h1>Painel do Administrador</h1>
-<p>
+<div class="admin-buttons">
   <a class="btn" href="{{ url_for('admin_users') }}">Gerenciar Usuários</a>
   <a class="btn secondary" href="{{ url_for('admin_records') }}">Registros</a>
   <a class="btn secondary" href="{{ url_for('admin_reports') }}">Relatórios por Filtro</a>
   <a class="btn secondary" href="{{ url_for('admin_photos') }}">Baixar Fotos</a>
  | <a class="btn" href="{{ url_for('admin_workmaps') }}">Mapas de Trabalho</a>
-</p>
+</div>
 {% endblock %}

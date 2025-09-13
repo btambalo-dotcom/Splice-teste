@@ -22,6 +22,7 @@
 <h1>Registro: {{ rec['device_name'] }}</h1>
 <p><strong>Fusões:</strong> {{ rec['fusion_count'] }}</p>
 <p><strong>Criado em:</strong> {{ rec['created_at'] }}</p>
+<p><strong>Autor:</strong> {{ rec['username'] if rec and rec.get('username') else session.get('username') }}</p>
 <div class="thumbs">
   {% if photos %}
     {% for p in photos %}
