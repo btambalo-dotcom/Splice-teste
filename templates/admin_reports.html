@@ -14,6 +14,14 @@
       <input type="date" name="end" value="{{ end }}">
     </div>
     <div>
+      <label>Feito de</label>
+      <input type="date" name="exec_start" value="{{ request.args.get('exec_start', '') }}">
+    </div>
+    <div>
+      <label>Feito até</label>
+      <input type="date" name="exec_end" value="{{ request.args.get('exec_end', '') }}">
+    </div>
+    <div>
       <label>Usuário</label>
       <select name="user_id">
         <option value="">-- Todos --</option>
