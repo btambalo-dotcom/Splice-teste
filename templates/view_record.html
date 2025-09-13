@@ -1,56 +1,36 @@
 {% extends "base.html" %}
-{% block title %}Detalhes
-<hr>
-<p><strong>Status:</strong> {{ record.get('status', 'draft') }}</p>
-{% if session.get('is_admin') %}
-  <form method="post" action="{{ url_for('record_launch', rec_id=record.id) }}">
-    <label>Selecionar Mapa de Trabalho:</label>
-    <select name="work_map_id" required>
-      {% for m in (get_user_accessible_maps(session.get('user_id')) if session.get('user_id') else []) %}
-        <option value="{{ m.id }}">{{ m.title }}</option>
-      {% endfor %}
-    </select>
-    <button class="btn">Marcar como lançado</button>
-  </form>
-{% endif %}
-{% if record.work_map_id %}
-  <p>Mapa vinculado: <a href="{{ url_for('workmap_download', wm_id=record.work_map_id) }}">Abrir PDF</a></p>
-{% endif %}
 
-{% endblock %}
+{% block title %}Detalhes do Registro{% endblock %}
+
 {% block content %}
-<h1>Registro: {{ rec['device_name'] }}</h1>
-<p><strong>Fusões:</strong> {{ rec['fusion_count'] }}</p>
-<p><strong>Criado em:</strong> {{ rec['created_at'] }}</p>
-<p><strong>Autor:</strong> {{ rec['username'] if rec and rec.get('username') else session.get('username') }}</p>
-<div class="thumbs">
-  {% if photos %}
-    {% for p in photos %}
-      <a href="{{ url_for('uploaded_file', filename=p['filename']) }}" target="_blank">
-        <img src="{{ url_for('uploaded_file', filename=p['filename']) }}" alt="foto">
-      </a>
-    {% endfor %}
-  {% else %}
-    <p>Sem fotos anexadas.</p>
-  {% endif %}
-</div>
-<p><a class="btn secondary" href="{{ url_for('dashboard') }}">Voltar</a></p>
+  <p><strong>Status:</strong> {{ rec.get('status', 'draft') }}</p>
 
-<hr>
-<p><strong>Status:</strong> {{ record.get('status', 'draft') }}</p>
-{% if session.get('is_admin') %}
-  <form method="post" action="{{ url_for('record_launch', rec_id=record.id) }}">
-    <label>Selecionar Mapa de Trabalho:</label>
-    <select name="work_map_id" required>
-      {% for m in (get_user_accessible_maps(session.get('user_id')) if session.get('user_id') else []) %}
-        <option value="{{ m.id }}">{{ m.title }}</option>
+  {% if session.get('is_admin') %}
+  <form method="post" action="{{ url_for('record_launch', rec_id=rec.id) }}">
+    <label for="work_map_id">Selecionar Mapa de Trabalho:</label>
+    <select id="work_map_id" name="work_map_id" required>
+      {% for m in (maps_for_admin or []) %}
+      <option value="{{ m.id }}">{{ m.title }}</option>
       {% endfor %}
     </select>
-    <button class="btn">Marcar como lançado</button>
+    <button type="submit" class="btn">Marcar como lançado</button>
   </form>
-{% endif %}
-{% if record.work_map_id %}
-  <p>Mapa vinculado: <a href="{{ url_for('workmap_download', wm_id=record.work_map_id) }}">Abrir PDF</a></p>
-{% endif %}
+  {% endif %}
 
+  {% if rec.work_map_id %}
+  <p>Mapa vinculado: <a href="{{ url_for('workmap_download', wm_id=rec.work_map_id) }}">Abrir PDF</a></p>
+  {% endif %}
+
+  <h3>Fotos</h3>
+  {% if photos %}
+    <div class="photo-grid">
+      {% for p in photos %}
+        <a href="{{ url_for('uploaded_file', filename=p.filename) }}" target="_blank">
+          <img src="{{ url_for('uploaded_file', filename=p.filename) }}" alt="foto" class="photo-thumb">
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p>Nenhuma foto enviada.</p>
+  {% endif %}
 {% endblock %}
