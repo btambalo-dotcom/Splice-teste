@@ -177,6 +177,7 @@ def backup_db():
         raise
 
 SCHEMA_OK = False
+
 def ensure_schema():
     global SCHEMA_OK
     if SCHEMA_OK:
@@ -184,40 +185,53 @@ def ensure_schema():
     try:
         with closing(get_db()) as db:
             cur = db.cursor()
-            # Create tables needed for maps/access
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS work_maps (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    title TEXT NOT NULL,
-                    filename TEXT NOT NULL,
-                    uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                );
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS user_work_map_access (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    work_map_id INTEGER NOT NULL,
-                    UNIQUE(user_id, work_map_id),
-                    FOREIGN KEY(user_id) REFERENCES users(id),
-                    FOREIGN KEY(work_map_id) REFERENCES work_maps(id)
-                );
-            """)
-            # Add columns to records if missing
+            # --- Base tables (idempotent)
+            cur.execute("""CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                is_admin INTEGER DEFAULT 0
+            )""")
+            cur.execute("""CREATE TABLE IF NOT EXISTS records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                device_name TEXT,
+                fusion_count INTEGER,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""")
+            cur.execute("""CREATE TABLE IF NOT EXISTS photos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                record_id INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""")
+            # --- Feature tables
+            cur.execute("""CREATE TABLE IF NOT EXISTS work_maps (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""")
+            cur.execute("""CREATE TABLE IF NOT EXISTS user_work_map_access (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                work_map_id INTEGER NOT NULL,
+                UNIQUE(user_id, work_map_id)
+            )""")
+            # --- Add columns to records if missing
             cols = {row[1] for row in cur.execute("PRAGMA table_info(records)").fetchall()}
             if 'status' not in cols:
                 cur.execute("ALTER TABLE records ADD COLUMN status TEXT DEFAULT 'draft'")
             if 'work_map_id' not in cols:
-                cur.execute("ALTER TABLE records ADD COLUMN work_map_id INTEGER REFERENCES work_maps(id)")
+                cur.execute("ALTER TABLE records ADD COLUMN work_map_id INTEGER")
             db.commit()
         SCHEMA_OK = True
     except Exception as e:
-        # Don't block the request; just print for logs
-        try:
-            print("ensure_schema warning:", e)
-        except Exception:
-            pass
+        print("ensure_schema warning:", e)
 
+@app.before_request
+def _ensure_schema_before_request():
+    ensure_schema()
 @app.before_request
 def _ensure_schema_before_request():
     ensure_schema()
@@ -1086,3 +1100,11 @@ def admin_backup_delete(name):
     except Exception as e:
         flash(("danger", f"Falha ao remover: {e}"))
     return redirect(url_for("admin_backups"))
+
+@app.template_filter('datetime')
+def _fmt_dt(ts):
+    try:
+        import datetime as _dt
+        return _dt.datetime.utcfromtimestamp(int(ts)).strftime('%Y-%m-%d %H:%M UTC')
+    except Exception:
+        return str(ts)
