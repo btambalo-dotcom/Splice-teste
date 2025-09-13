@@ -11,11 +11,11 @@
     <div style="display:flex;justify-content:space-between;align-items:center;">
       <div><strong>Splice Admin App</strong></div>
       <nav>
-        {% if session.get('user_id') %}
-          <span>Olá, {{ session.get('username') }}{% if session.get('is_admin') %} (admin){% endif %}</span>
+        {% if session['user_id'] %}
+          <span>Olá, {{ session['username'] }}{% if session['is_admin'] %} (admin){% endif %}</span>
           <a href="{{ url_for('dashboard') }}">Dashboard</a>
           <a href="{{ url_for('new_record') }}">Novo Registro</a>
-          {% if session.get('is_admin') %}
+          {% if session['is_admin'] %}
             <a href="{{ url_for('admin_home') }}">Admin</a>
           {% endif %}
           <a href="{{ url_for('logout') }}">Sair</a>

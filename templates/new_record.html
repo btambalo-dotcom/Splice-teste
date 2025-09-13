@@ -8,7 +8,7 @@
   <label>Número de fusões</label>
   <input type="number" name="fusion_count" min="0" step="1" required>
   <label>Data que foi feito</label>
-  <input type="date" name="executed_on" value="{{ (request.form.get('executed_on') or [])|default('', true) }}">
+  <input type="date" name="executed_on" value="{{ (request.form['executed_on'] or [])|default('', true) }}">
   <label>Fotos (até 6 imagens)</label>
   <input type="file" name="photos" accept="image/*" multiple>
   <small>Tipos permitidos: png, jpg, jpeg, gif, webp</small>

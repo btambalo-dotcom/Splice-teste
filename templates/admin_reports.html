@@ -15,11 +15,11 @@
     </div>
     <div>
       <label>Feito de</label>
-      <input type="date" name="exec_start" value="{{ request.args.get('exec_start', '') }}">
+      <input type="date" name="exec_start" value="{{ request.(args['exec_start'] if args['exec_start'] else '') }}">
     </div>
     <div>
       <label>Feito até</label>
-      <input type="date" name="exec_end" value="{{ request.args.get('exec_end', '') }}">
+      <input type="date" name="exec_end" value="{{ request.(args['exec_end'] if args['exec_end'] else '') }}">
     </div>
     <div>
       <label>Usuário</label>
