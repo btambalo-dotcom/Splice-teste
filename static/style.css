@@ -18,16 +18,3 @@ button, .btn { background:#2563eb; color:#fff; border:none; padding:10px 14px; b
 .table th, .table td { border:1px solid #e5e7eb; padding:8px; text-align:left; }
 nav a { margin-left:12px; color:#fff; }
 .thumbs img { max-width: 180px; border-radius:8px; margin: 6px; border:1px solid #e5e7eb; }
-
-
-/* Responsive admin buttons container */
-.admin-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin: 10px 0;
-}
-.admin-buttons a {
-  flex: 1 1 200px;
-  text-align: center;
-}
