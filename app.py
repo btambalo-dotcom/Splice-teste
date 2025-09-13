@@ -8,6 +8,14 @@ import os, sqlite3, csv, zipfile
 from contextlib import closing
 from io import StringIO, BytesIO
 
+# Quais tipos de arquivo são aceitos para upload
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
+
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Diretório de dados persistente (Render Disk)
@@ -78,8 +86,6 @@ def init_db():
             db.execute("ALTER TABLE records ADD COLUMN executed_on DATE DEFAULT (DATE('now'));")
 
         db.commit()
-def allowed_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @app.before_request
 def ensure_db_initialized():
@@ -426,6 +432,8 @@ def admin_reports():
 def admin_reports_data():
     start_str = request.args.get("start", "").strip()
     end_str = request.args.get("end", "").strip()
+    exec_start = request.args.get("exec_start", "").strip()
+    exec_end = request.args.get("exec_end", "").strip()
     user_id = request.args.get("user_id", type=int)
 
     clauses = []; params = []
@@ -433,6 +441,10 @@ def admin_reports_data():
         clauses.append("date(r.created_at) >= date(?)"); params.append(start_str)
     if end_str:
         clauses.append("date(r.created_at) <= date(?)"); params.append(end_str)
+    if exec_start:
+        clauses.append("date(r.executed_on) >= date(?)"); params.append(exec_start)
+    if exec_end:
+        clauses.append("date(r.executed_on) <= date(?)"); params.append(exec_end)
     if user_id:
         clauses.append("r.user_id = ?"); params.append(user_id)
     where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
@@ -458,6 +470,8 @@ def admin_reports_data():
 def admin_reports_csv():
     start_str = request.args.get("start", "").strip()
     end_str = request.args.get("end", "").strip()
+    exec_start = request.args.get("exec_start", "").strip()
+    exec_end = request.args.get("exec_end", "").strip()
     user_id = request.args.get("user_id", type=int)
 
     clauses = []; params = []
@@ -465,6 +479,14 @@ def admin_reports_csv():
         clauses.append("date(r.created_at) >= date(?)"); params.append(start_str)
     if end_str:
         clauses.append("date(r.created_at) <= date(?)"); params.append(end_str)
+    if exec_start:
+        clauses.append("date(r.executed_on) >= date(?)"); params.append(exec_start)
+    if exec_end:
+        clauses.append("date(r.executed_on) <= date(?)"); params.append(exec_end)
+    if exec_start:
+        clauses.append("date(r.executed_on) >= date(?)"); params.append(exec_start)
+    if exec_end:
+        clauses.append("date(r.executed_on) <= date(?)"); params.append(exec_end)
     if user_id:
         clauses.append("r.user_id = ?"); params.append(user_id)
     where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
