@@ -1,5 +1,23 @@
 {% extends "base.html" %}
-{% block title %}Detalhes{% endblock %}
+{% block title %}Detalhes
+<hr>
+<p><strong>Status:</strong> {{ record.status or 'draft' }}</p>
+{% if session.get('is_admin') %}
+  <form method="post" action="{{ url_for('record_launch', rec_id=record.id) }}">
+    <label>Selecionar Mapa de Trabalho:</label>
+    <select name="work_map_id" required>
+      {% for m in (get_user_accessible_maps(session.get('user_id')) if session.get('user_id') else []) %}
+        <option value="{{ m.id }}">{{ m.title }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn">Marcar como lançado</button>
+  </form>
+{% endif %}
+{% if record.work_map_id %}
+  <p>Mapa vinculado: <a href="{{ url_for('workmap_download', wm_id=record.work_map_id) }}">Abrir PDF</a></p>
+{% endif %}
+
+{% endblock %}
 {% block content %}
 <h1>Registro: {{ rec['device_name'] }}</h1>
 <p><strong>Fusões:</strong> {{ rec['fusion_count'] }}</p>
@@ -16,4 +34,22 @@
   {% endif %}
 </div>
 <p><a class="btn secondary" href="{{ url_for('dashboard') }}">Voltar</a></p>
+
+<hr>
+<p><strong>Status:</strong> {{ record.status or 'draft' }}</p>
+{% if session.get('is_admin') %}
+  <form method="post" action="{{ url_for('record_launch', rec_id=record.id) }}">
+    <label>Selecionar Mapa de Trabalho:</label>
+    <select name="work_map_id" required>
+      {% for m in (get_user_accessible_maps(session.get('user_id')) if session.get('user_id') else []) %}
+        <option value="{{ m.id }}">{{ m.title }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn">Marcar como lançado</button>
+  </form>
+{% endif %}
+{% if record.work_map_id %}
+  <p>Mapa vinculado: <a href="{{ url_for('workmap_download', wm_id=record.work_map_id) }}">Abrir PDF</a></p>
+{% endif %}
+
 {% endblock %}
