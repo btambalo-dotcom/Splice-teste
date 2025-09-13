@@ -7,7 +7,7 @@ from datetime import datetime
 import csv, io, os
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey"
+app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///splice.db"
 app.config["UPLOAD_FOLDER"] = "static/uploads"
 app.config["MAP_FOLDER"] = "static/maps"
@@ -37,12 +37,10 @@ class WorkMap(db.Model):
 
 # Helpers
 def require_login():
-    if "user_id" not in session:
-        return False
-    return True
+    return "user_id" in session
 
 def require_admin():
-    return "role" in session and session["role"] == "admin"
+    return session.get("role") == "admin"
 
 # Rotas básicas
 @app.route("/")
@@ -155,7 +153,6 @@ def reports():
     if end:
         try:
             dt = datetime.strptime(end, "%Y-%m-%d")
-            # incluir o dia inteiro
             q = q.filter(Device.timestamp < dt.replace(hour=23, minute=59, second=59))
         except ValueError:
             pass
@@ -222,4 +219,5 @@ def reports_export():
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
+    # Execução local (Render usará o Procfile/gunicorn)
     app.run(host="0.0.0.0", port=5000)
