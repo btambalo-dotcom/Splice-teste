@@ -374,8 +374,6 @@ def view_record(record_id):
     db = get_db()
     uid = session.get('user_id')
     is_admin = bool(session.get('is_admin'))
-
-    # 1) Try the full query with status/work_map_id and author
     rec = None
     try:
         rec = db.execute(
@@ -384,35 +382,24 @@ def view_record(record_id):
             "WHERE r.id = ? AND (r.user_id = ? OR ?)",
             (record_id, uid, 1 if is_admin else 0)
         ).fetchone()
-    except Exception as e:
-        try:
-            # 2) Fallback without new columns
-            rec = db.execute(
-                "SELECT r.id, r.device_name, r.fusion_count, r.created_at, u.username AS author "
-                "FROM records r JOIN users u ON u.id = r.user_id "
-                "WHERE r.id = ? AND (r.user_id = ? OR ?)",
-                (record_id, uid, 1 if is_admin else 0)
-            ).fetchone()
-        except Exception as _:
-            rec = None
-
-    if not rec:
-        abort(404)
-
-    # photos (defensive)
+    except Exception:
+        rec = db.execute(
+            "SELECT r.id, r.device_name, r.fusion_count, r.created_at, u.username AS author "
+            "FROM records r JOIN users u ON u.id = r.user_id "
+            "WHERE r.id = ? AND (r.user_id = ? OR ?)",
+            (record_id, uid, 1 if is_admin else 0)
+        ).fetchone()
+    if not rec: abort(404)
     try:
         photos = db.execute("SELECT id, filename FROM photos WHERE record_id = ?", (record_id,)).fetchall()
     except Exception:
         photos = []
-
-    # maps for admin (defensive)
     maps_for_admin = []
     if is_admin:
         try:
             maps_for_admin = db.execute("SELECT * FROM work_maps ORDER BY uploaded_at DESC").fetchall()
         except Exception:
             maps_for_admin = []
-
     return render_template("view_record.html", rec=rec, photos=photos, maps_for_admin=maps_for_admin)
     
 
@@ -1099,4 +1086,3 @@ def admin_backup_delete(name):
     except Exception as e:
         flash(("danger", f"Falha ao remover: {e}"))
     return redirect(url_for("admin_backups"))
-
