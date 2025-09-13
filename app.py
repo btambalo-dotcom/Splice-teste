@@ -197,53 +197,64 @@ def dashboard():
     ).fetchall()
     return render_template("dashboard.html", records=recs)
 
+
 @app.route("/new", methods=["GET", "POST"])
 @login_required
 def new_record():
+    db = get_db()
+    # Load maps available for this user
+    user_id = session["user_id"]
+    try:
+        maps = get_user_accessible_maps(user_id)
+    except Exception:
+        maps = []
     if request.method == "POST":
-        device_name = request.form.get("device_name", "").strip()
-        fusion_count = request.form.get("fusion_count", "").strip()
-        files = request.files.getlist("photos")
-        if not device_name or not fusion_count:
-            flash("Informe nome do dispositivo e número de fusões.", "error")
-            return redirect(url_for("new_record"))
-        try:
-            fusion_count = int(fusion_count)
-            if fusion_count < 0:
-                raise ValueError
-        except ValueError:
-            flash("Número de fusões inválido.", "error")
-            return redirect(url_for("new_record"))
-        if len(files) > MAX_FILES_PER_RECORD:
-            flash(f"Máximo de {MAX_FILES_PER_RECORD} fotos por registro.", "error")
-            return redirect(url_for("new_record"))
-        db = get_db()
-        cur = db.execute("INSERT INTO records (user_id, device_name, fusion_count) VALUES (?, ?, ?)", (session["user_id"], device_name, fusion_count))
+        device_name = request.form.get("device_name","").strip()
+        fusion_count = request.form.get("fusion_count","").strip()
+        work_map_id = request.form.get("work_map_id", type=int)
+        if not device_name or not fusion_count.isdigit():
+            flash(("danger", "Preencha o nome do dispositivo e um número de fusões válido."))
+            return render_template("new_record.html", maps=maps)
+        # Require a work map on creation
+        if not work_map_id:
+            flash(("danger", "Selecione um Mapa de Trabalho."))
+            return render_template("new_record.html", maps=maps)
+        # Validate map permission
+        if not session.get("is_admin") and not any(m["id"] == work_map_id for m in maps):
+            flash(("danger", "Você não tem acesso a esse Mapa de Trabalho."))
+            return render_template("new_record.html", maps=maps)
+        cur = db.cursor()
+        cur.execute(
+            "INSERT INTO records (user_id, device_name, fusion_count, status, work_map_id) VALUES (?, ?, ?, COALESCE(?, 'draft'), ?)",
+            (user_id, device_name, int(fusion_count), "draft", work_map_id)
+        )
         record_id = cur.lastrowid
+        # handle photos
+        files = request.files.getlist("photos")
         saved_any = False
-        for file in files:
-            if not file or file.filename == "":
+        from werkzeug.utils import secure_filename
+        import os
+        for f in files[:MAX_FILES_PER_RECORD]:
+            fname = f.filename
+            if not fname:
                 continue
-            if not allowed_file(file.filename):
-                flash("Tipo de arquivo não permitido (png/jpg/jpeg/gif/webp).", "error")
+            ext = fname.split(".")[-1].lower()
+            if ext not in ALLOWED_EXTENSIONS:
                 continue
-            fname = secure_filename(file.filename)
-            base, ext = os.path.splitext(fname)
-            final_name = f"{base}{ext}"
-            cnt = 1
-            while os.path.exists(os.path.join(app.config["UPLOAD_FOLDER"], final_name)):
-                final_name = f"{base}_{cnt}{ext}"; cnt += 1
-            file.save(os.path.join(app.config["UPLOAD_FOLDER"], final_name))
-            db.execute("INSERT INTO photos (record_id, filename) VALUES (?, ?)", (record_id, final_name))
+            safe = secure_filename(fname)
+            dest = os.path.join(app.config["UPLOAD_FOLDER"], safe)
+            f.save(dest)
+            cur.execute("INSERT INTO photos (record_id, filename) VALUES (?, ?)", (record_id, safe))
             saved_any = True
         db.commit()
         if not saved_any and len(files) > 0:
-            flash("Nenhuma foto foi salva (verifique os tipos permitidos).", "warning")
+            flash(("warning", "Nenhuma foto foi salva (verifique os tipos permitidos)."))
         else:
-            flash("Registro criado com sucesso!", "success")
+            flash(("success", "Registro criado com sucesso!"))
         return redirect(url_for("dashboard"))
-    return render_template("new_record.html")
-
+    return render_template("new_record.html", maps=maps)
+    
+@app.route(
 
 @app.route("/record/<int:record_id>")
 @login_required
