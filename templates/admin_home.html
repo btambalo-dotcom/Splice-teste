@@ -8,5 +8,7 @@
   <a class="btn secondary" href="{{ url_for('admin_reports') }}">Relatórios por Filtro</a>
   <a class="btn secondary" href="{{ url_for('admin_photos') }}">Baixar Fotos</a>
  | <a class="btn" href="{{ url_for('admin_workmaps') }}">Mapas de Trabalho</a>
+  <a class="btn secondary" href="{{ url_for('admin_backup') }}" onclick="return confirm('Criar backup do banco agora?')">Backup Agora</a>
+  <a class="btn secondary" href="{{ url_for('admin_backups') }}">Ver Backups</a>
 </div>
 {% endblock %}
