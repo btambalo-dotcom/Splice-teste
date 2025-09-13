@@ -1,36 +1,20 @@
 {% extends "base.html" %}
-
-{% block title %}Detalhes do Registro{% endblock %}
-
+{% block title %}Detalhes{% endblock %}
 {% block content %}
-  <p><strong>Status:</strong> {{ rec.get('status', 'draft') }}</p>
-
-  {% if session.get('is_admin') %}
-  <form method="post" action="{{ url_for('record_launch', rec_id=rec.id) }}">
-    <label for="work_map_id">Selecionar Mapa de Trabalho:</label>
-    <select id="work_map_id" name="work_map_id" required>
-      {% for m in (maps_for_admin or []) %}
-      <option value="{{ m.id }}">{{ m.title }}</option>
-      {% endfor %}
-    </select>
-    <button type="submit" class="btn">Marcar como lançado</button>
-  </form>
-  {% endif %}
-
-  {% if rec.work_map_id %}
-  <p>Mapa vinculado: <a href="{{ url_for('workmap_download', wm_id=rec.work_map_id) }}">Abrir PDF</a></p>
-  {% endif %}
-
-  <h3>Fotos</h3>
+<h1>Registro: {{ rec['device_name'] }}</h1>
+<p><strong>Fusões:</strong> {{ rec['fusion_count'] }}</p>
+<p><strong>Feito em:</strong> {{ rec.get('executed_on','') }}</p>
+<p><strong>Criado em:</strong> {{ rec['created_at'] }}</p>
+<div class="thumbs">
   {% if photos %}
-    <div class="photo-grid">
-      {% for p in photos %}
-        <a href="{{ url_for('uploaded_file', filename=p.filename) }}" target="_blank">
-          <img src="{{ url_for('uploaded_file', filename=p.filename) }}" alt="foto" class="photo-thumb">
-        </a>
-      {% endfor %}
-    </div>
+    {% for p in photos %}
+      <a href="{{ url_for('uploaded_file', filename=p['filename']) }}" target="_blank">
+        <img src="{{ url_for('uploaded_file', filename=p['filename']) }}" alt="foto">
+      </a>
+    {% endfor %}
   {% else %}
-    <p>Nenhuma foto enviada.</p>
+    <p>Sem fotos anexadas.</p>
   {% endif %}
+</div>
+<p><a class="btn secondary" href="{{ url_for('dashboard') }}">Voltar</a></p>
 {% endblock %}

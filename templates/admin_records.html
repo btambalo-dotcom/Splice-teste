@@ -18,16 +18,16 @@
 </p>
 
 <table class="table">
-  <tr><th>ID</th><th>Usuário</th><th>Dispositivo</th><th>Fusões</th><th>Criado em</th><th>Fotos</th><th>Detalhes</th></tr>
+  <tr><th>ID</th><th>Usuário</th><th>Dispositivo</th><th>Fusões</th><th>Criado em</th><th>Fotos</th></tr>
   {% for r in records %}
   <tr>
     <td>{{ r.id }}</td>
     <td>{{ r.username }}</td>
     <td>{{ r.device_name }}</td>
     <td>{{ r.fusion_count }}</td>
+    <td>{{ r.executed_on }}</td>
     <td>{{ r.created_at }}</td>
     <td><a class="btn" href="{{ url_for('view_record', record_id=r.id) }}" target="_blank">ver</a></td>
-    <td><a class="btn secondary" href='{{ url_for("view_record", record_id=r.id) }}'>Abrir</a></td>
   </tr>
   {% endfor %}
 </table>
