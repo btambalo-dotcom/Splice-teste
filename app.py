@@ -9,8 +9,10 @@ from contextlib import closing
 from io import StringIO, BytesIO
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "uploads")
-WORKMAP_FOLDER = os.path.join(BASE_DIR, "static", "workmaps")
+DATA_DIR = os.environ.get("DATA_DIR", "/data")  # Persistente no Render Disk
+DB_PATH = os.environ.get("DB_PATH", os.path.join(DATA_DIR, "app.db"))
+UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", os.path.join(DATA_DIR, "uploads"))
+WORKMAP_FOLDER = os.environ.get("WORKMAP_FOLDER", os.path.join(DATA_DIR, "workmaps"))
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 MAX_FILES_PER_RECORD = 6
 
@@ -18,7 +20,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(WORKMAP_FOLDER, exist_ok=True)
 
 app = Flask(__name__)
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+UPLOAD_FOLDER = UPLOAD_FOLDER
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 max_len_mb = int(os.environ.get("MAX_CONTENT_LENGTH_MB", "20"))
 app.config["MAX_CONTENT_LENGTH"] = max_len_mb * 1024 * 1024
@@ -315,7 +317,7 @@ def new_record():
             if ext not in ALLOWED_EXTENSIONS:
                 continue
             safe = secure_filename(fname)
-            dest = os.path.join(app.config["UPLOAD_FOLDER"], safe)
+            dest = os.path.join(UPLOAD_FOLDER, safe)
             f.save(dest)
             cur.execute("INSERT INTO photos (record_id, filename) VALUES (?, ?)", (record_id, safe))
             saved_any = True
@@ -379,7 +381,7 @@ def view_record(record_id):
 @app.route("/uploads/<path:filename>")
 @login_required
 def uploaded_file(filename):
-    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+    return send_from_directory(UPLOAD_FOLDER, filename)
 
 @app.route("/record/<int:record_id>/delete", methods=["POST"])
 @login_required
@@ -390,7 +392,7 @@ def delete_record(record_id):
         abort(404)
     photos = db.execute("SELECT filename FROM photos WHERE record_id = ?", (record_id,)).fetchall()
     for p in photos:
-        fpath = os.path.join(app.config["UPLOAD_FOLDER"], p["filename"])
+        fpath = os.path.join(UPLOAD_FOLDER, p["filename"])
         if os.path.exists(fpath):
             try: os.remove(fpath)
             except Exception: pass
