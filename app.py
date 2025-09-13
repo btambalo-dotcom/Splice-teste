@@ -9,18 +9,14 @@ from contextlib import closing
 from io import StringIO, BytesIO
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.environ.get("DATA_DIR", "/data")  # Persistente no Render Disk
-DB_PATH = os.environ.get("DB_PATH", os.path.join(DATA_DIR, "app.db"))
-UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", os.path.join(DATA_DIR, "uploads"))
-WORKMAP_FOLDER = os.environ.get("WORKMAP_FOLDER", os.path.join(DATA_DIR, "workmaps"))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "uploads")
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 MAX_FILES_PER_RECORD = 6
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(WORKMAP_FOLDER, exist_ok=True)
 
 app = Flask(__name__)
-UPLOAD_FOLDER = UPLOAD_FOLDER
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 max_len_mb = int(os.environ.get("MAX_CONTENT_LENGTH_MB", "20"))
 app.config["MAX_CONTENT_LENGTH"] = max_len_mb * 1024 * 1024
@@ -31,22 +27,6 @@ def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
-
-
-def user_has_access_to_map(user_id, work_map_id):
-    with closing(get_db()) as db:
-        row = db.execute(
-            "SELECT 1 FROM user_work_map_access WHERE user_id=? AND work_map_id=?",
-            (user_id, work_map_id)
-        ).fetchone()
-        return row is not None
-
-def get_user_accessible_maps(user_id):
-    with closing(get_db()) as db:
-        return db.execute(
-            "SELECT wm.* FROM work_maps wm JOIN user_work_map_access a ON a.work_map_id = wm.id WHERE a.user_id=? ORDER BY wm.uploaded_at DESC",
-            (user_id,)
-        ).fetchall()
 
 def init_db():
     with closing(get_db()) as db:
@@ -63,6 +43,7 @@ def init_db():
                 user_id INTEGER NOT NULL,
                 device_name TEXT NOT NULL,
                 fusion_count INTEGER NOT NULL,
+                executed_on DATE DEFAULT (DATE('now')),
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(user_id) REFERENCES users(id)
             );
@@ -78,163 +59,12 @@ def init_db():
         colnames = {c[1] for c in cols}
         if "is_admin" not in colnames:
             db.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0;")
-        db.commit()
-
-    # AUGMENTED: create default admin
-    with closing(get_db()) as db:
-        cur = db.cursor()
-        row = cur.execute("SELECT id FROM users WHERE username=?", ("admin",)).fetchone()
-        if not row:
-            cur.execute(
-                "INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)",
-                ("admin", generate_password_hash("admin123"))
-            )
-            db.commit()
-
-    
-
-    # AUGMENTED: create default admin
-    with closing(get_db()) as db:
-        cur = db.cursor()
-        row = cur.execute("SELECT id FROM users WHERE username=?", ("admin",)).fetchone()
-        if not row:
-            cur.execute(
-                "INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)",
-                ("admin", generate_password_hash("admin123"))
-            )
-            db.commit()
-
-
-
-    # AUGMENTED: work maps and record status
-    with closing(get_db()) as db:
-        cur = db.cursor()
-        # Create tables if not exist
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS work_maps (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                filename TEXT NOT NULL,
-                uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            );
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS user_work_map_access (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                work_map_id INTEGER NOT NULL,
-                UNIQUE(user_id, work_map_id),
-                FOREIGN KEY(user_id) REFERENCES users(id),
-                FOREIGN KEY(work_map_id) REFERENCES work_maps(id)
-            );
-        """)
-        # Add columns to records if missing
-        cols = {row[1] for row in cur.execute("PRAGMA table_info(records)").fetchall()}
-        if 'status' not in cols:
-            cur.execute("ALTER TABLE records ADD COLUMN status TEXT DEFAULT 'draft'")
-        if 'work_map_id' not in cols:
-            cur.execute("ALTER TABLE records ADD COLUMN work_map_id INTEGER REFERENCES work_maps(id)")
-        db.commit()
-
-
-# === SCHEMA GUARD: ensure required tables/columns exist even on old DBs ===
-
-# ====== Healthcheck & Backup utilities ======
-def is_writable(path):
-    try:
-        os.makedirs(path, exist_ok=True)
-        testfile = os.path.join(path, ".write_test")
-        with open(testfile, "w") as f:
-            f.write("ok")
-        os.remove(testfile)
-        return True
-    except Exception as e:
-        try:
-            print("Writable check failed for", path, "->", e)
-        except Exception:
-            pass
-        return False
-
-BACKUP_DIR = os.path.join(DATA_DIR, "backups")
-os.makedirs(BACKUP_DIR, exist_ok=True)
-
-def backup_db():
-    # Use SQLite online backup API for consistency
-    try:
-        import datetime
-        ts = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-        dest = os.path.join(BACKUP_DIR, f"app-{ts}.db")
-        src = sqlite3.connect(DB_PATH)
-        dst = sqlite3.connect(dest)
-        with dst:
-            src.backup(dst)
-        src.close()
-        dst.close()
-        print("Backup created ->", dest)
-        return dest
-    except Exception as e:
-        print("Backup failed:", e)
-        raise
-
-SCHEMA_OK = False
-
-def ensure_schema():
-    global SCHEMA_OK
-    if SCHEMA_OK:
-        return
-    try:
-        with closing(get_db()) as db:
-            cur = db.cursor()
-            # --- Base tables (idempotent)
-            cur.execute("""CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                is_admin INTEGER DEFAULT 0
-            )""")
-            cur.execute("""CREATE TABLE IF NOT EXISTS records (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                device_name TEXT,
-                fusion_count INTEGER,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )""")
-            cur.execute("""CREATE TABLE IF NOT EXISTS photos (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                record_id INTEGER NOT NULL,
-                filename TEXT NOT NULL,
-                uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )""")
-            # --- Feature tables
-            cur.execute("""CREATE TABLE IF NOT EXISTS work_maps (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                filename TEXT NOT NULL,
-                uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )""")
-            cur.execute("""CREATE TABLE IF NOT EXISTS user_work_map_access (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                work_map_id INTEGER NOT NULL,
-                UNIQUE(user_id, work_map_id)
-            )""")
-            # --- Add columns to records if missing
-            cols = {row[1] for row in cur.execute("PRAGMA table_info(records)").fetchall()}
-            if 'status' not in cols:
-                cur.execute("ALTER TABLE records ADD COLUMN status TEXT DEFAULT 'draft'")
-            if 'work_map_id' not in cols:
-                cur.execute("ALTER TABLE records ADD COLUMN work_map_id INTEGER")
-            db.commit()
-        SCHEMA_OK = True
-    except Exception as e:
-        print("ensure_schema warning:", e)
-
-@app.before_request
-def _ensure_schema_before_request():
-    ensure_schema()
-@app.before_request
-def _ensure_schema_before_request():
-    ensure_schema()
+        
+        cols = db.execute("PRAGMA table_info(records)").fetchall()
+        colnames = {c[1] for c in cols}
+        if "executed_on" not in colnames:
+            db.execute("ALTER TABLE records ADD COLUMN executed_on DATE DEFAULT (DATE('now'));")
+db.commit()
 
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -324,103 +154,78 @@ def dashboard():
     ).fetchall()
     return render_template("dashboard.html", records=recs)
 
-
 @app.route("/new", methods=["GET", "POST"])
 @login_required
 def new_record():
-    db = get_db()
-    # Load maps available for this user
-    user_id = session["user_id"]
-    try:
-        maps = get_user_accessible_maps(user_id)
-    except Exception:
-        maps = []
     if request.method == "POST":
-        device_name = request.form.get("device_name","").strip()
-        fusion_count = request.form.get("fusion_count","").strip()
-        work_map_id = request.form.get("work_map_id", type=int)
-        if not device_name or not fusion_count.isdigit():
-            flash(("danger", "Preencha o nome do dispositivo e um número de fusões válido."))
-            return render_template("new_record.html", maps=maps)
-        # Require a work map on creation
-        if not work_map_id:
-            flash(("danger", "Selecione um Mapa de Trabalho."))
-            return render_template("new_record.html", maps=maps)
-        # Validate map permission
-        if not session.get("is_admin") and not any(m["id"] == work_map_id for m in maps):
-            flash(("danger", "Você não tem acesso a esse Mapa de Trabalho."))
-            return render_template("new_record.html", maps=maps)
-        cur = db.cursor()
-        cur.execute(
-            "INSERT INTO records (user_id, device_name, fusion_count, status, work_map_id) VALUES (?, ?, ?, COALESCE(?, 'draft'), ?)",
-            (user_id, device_name, int(fusion_count), "draft", work_map_id)
-        )
-        record_id = cur.lastrowid
-        # handle photos
+        device_name = request.form.get("device_name", "").strip()
+        fusion_count = request.form.get("fusion_count", "").strip()
         files = request.files.getlist("photos")
+        executed_on_str = request.form.get("executed_on", "").strip()
+        # Valida formato YYYY-MM-DD; se vazio/errado, usa hoje
+        try:
+            if executed_on_str:
+                _y, _m, _d = executed_on_str.split("-")
+                _ = int(_y); _ = int(_m); _ = int(_d)
+            else:
+                executed_on_str = date.today().isoformat()
+        except Exception:
+            executed_on_str = date.today().isoformat()
+
+        if not device_name or not fusion_count:
+            flash("Informe nome do dispositivo e número de fusões.", "error")
+            return redirect(url_for("new_record"))
+        try:
+            fusion_count = int(fusion_count)
+            if fusion_count < 0:
+                raise ValueError
+        except ValueError:
+            flash("Número de fusões inválido.", "error")
+            return redirect(url_for("new_record"))
+        if len(files) > MAX_FILES_PER_RECORD:
+            flash(f"Máximo de {MAX_FILES_PER_RECORD} fotos por registro.", "error")
+            return redirect(url_for("new_record"))
+        db = get_db()
+        cur = db.execute("INSERT INTO records (user_id, device_name, fusion_count, executed_on) VALUES (?, ?, ?, ?)", (session["user_id"], device_name, fusion_count, executed_on_str))
+        record_id = cur.lastrowid
         saved_any = False
-        from werkzeug.utils import secure_filename
-        import os
-        for f in files[:MAX_FILES_PER_RECORD]:
-            fname = f.filename
-            if not fname:
+        for file in files:
+            if not file or file.filename == "":
                 continue
-            ext = fname.split(".")[-1].lower()
-            if ext not in ALLOWED_EXTENSIONS:
+            if not allowed_file(file.filename):
+                flash("Tipo de arquivo não permitido (png/jpg/jpeg/gif/webp).", "error")
                 continue
-            safe = secure_filename(fname)
-            dest = os.path.join(UPLOAD_FOLDER, safe)
-            f.save(dest)
-            cur.execute("INSERT INTO photos (record_id, filename) VALUES (?, ?)", (record_id, safe))
+            fname = secure_filename(file.filename)
+            base, ext = os.path.splitext(fname)
+            final_name = f"{base}{ext}"
+            cnt = 1
+            while os.path.exists(os.path.join(app.config["UPLOAD_FOLDER"], final_name)):
+                final_name = f"{base}_{cnt}{ext}"; cnt += 1
+            file.save(os.path.join(app.config["UPLOAD_FOLDER"], final_name))
+            db.execute("INSERT INTO photos (record_id, filename) VALUES (?, ?)", (record_id, final_name))
             saved_any = True
         db.commit()
         if not saved_any and len(files) > 0:
-            flash(("warning", "Nenhuma foto foi salva (verifique os tipos permitidos)."))
+            flash("Nenhuma foto foi salva (verifique os tipos permitidos).", "warning")
         else:
-            flash(("success", "Registro criado com sucesso!"))
+            flash("Registro criado com sucesso!", "success")
         return redirect(url_for("dashboard"))
-    return render_template("new_record.html", maps=maps)
-    
+    return render_template("new_record.html")
 
 @app.route("/record/<int:record_id>")
 @login_required
 def view_record(record_id):
     db = get_db()
-    uid = session.get('user_id')
-    is_admin = bool(session.get('is_admin'))
-    rec = None
-    try:
-        rec = db.execute(
-            "SELECT r.id, r.device_name, r.fusion_count, r.created_at, r.status, r.work_map_id, u.username AS author "
-            "FROM records r JOIN users u ON u.id = r.user_id "
-            "WHERE r.id = ? AND (r.user_id = ? OR ?)",
-            (record_id, uid, 1 if is_admin else 0)
-        ).fetchone()
-    except Exception:
-        rec = db.execute(
-            "SELECT r.id, r.device_name, r.fusion_count, r.created_at, u.username AS author "
-            "FROM records r JOIN users u ON u.id = r.user_id "
-            "WHERE r.id = ? AND (r.user_id = ? OR ?)",
-            (record_id, uid, 1 if is_admin else 0)
-        ).fetchone()
-    if not rec: abort(404)
-    try:
-        photos = db.execute("SELECT id, filename FROM photos WHERE record_id = ?", (record_id,)).fetchall()
-    except Exception:
-        photos = []
-    maps_for_admin = []
-    if is_admin:
-        try:
-            maps_for_admin = db.execute("SELECT * FROM work_maps ORDER BY uploaded_at DESC").fetchall()
-        except Exception:
-            maps_for_admin = []
-    return render_template("view_record.html", rec=rec, photos=photos, maps_for_admin=maps_for_admin)
-    
+    rec = db.execute("SELECT id, device_name, fusion_count, executed_on, created_at FROM records WHERE id = ? AND user_id = ?", (record_id, session["user_id"])).fetchone()
+    if not rec:
+        abort(404)
+    photos = db.execute("SELECT id, filename FROM photos WHERE record_id = ?", (record_id,)).fetchall()
+    return render_template("view_record.html", rec=rec, photos=photos)
 
 @app.route("/uploads/<path:filename>")
 @login_required
 def uploaded_file(filename):
-    return send_from_directory(UPLOAD_FOLDER, filename)
+    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 @app.route("/record/<int:record_id>/delete", methods=["POST"])
 @login_required
@@ -431,7 +236,7 @@ def delete_record(record_id):
         abort(404)
     photos = db.execute("SELECT filename FROM photos WHERE record_id = ?", (record_id,)).fetchall()
     for p in photos:
-        fpath = os.path.join(UPLOAD_FOLDER, p["filename"])
+        fpath = os.path.join(app.config["UPLOAD_FOLDER"], p["filename"])
         if os.path.exists(fpath):
             try: os.remove(fpath)
             except Exception: pass
@@ -511,13 +316,13 @@ def admin_records():
     db = get_db()
     if user_id:
         recs = db.execute(
-            "SELECT r.id, r.device_name, r.fusion_count, r.created_at, u.username "
+            "SELECT r.id, r.device_name, r.fusion_count, r.executed_on, r.created_at, u.username "
             "FROM records r JOIN users u ON u.id = r.user_id WHERE r.user_id = ? ORDER BY r.created_at DESC",
             (user_id,),
         ).fetchall()
     else:
         recs = db.execute(
-            "SELECT r.id, r.device_name, r.fusion_count, r.created_at, u.username "
+            "SELECT r.id, r.device_name, r.fusion_count, r.executed_on, r.created_at, u.username "
             "FROM records r JOIN users u ON u.id = r.user_id ORDER BY r.created_at DESC"
         ).fetchall()
     users = db.execute("SELECT id, username FROM users ORDER BY username ASC").fetchall()
@@ -859,16 +664,16 @@ def admin_photos_zip():
 def export_csv():
     db = get_db()
     rows = db.execute(
-        "SELECT id, device_name, fusion_count, created_at FROM records WHERE user_id = ? ORDER BY created_at DESC",
+        "SELECT id, device_name, fusion_count, executed_on, created_at FROM records WHERE user_id = ? ORDER BY created_at DESC",
         (session["user_id"],),
     ).fetchall()
     si = StringIO(); writer = csv.writer(si)
-    writer.writerow(["id", "device_name", "fusion_count", "created_at", "photo_urls"])
+    writer.writerow(["id", "device_name", "fusion_count", "executed_on", "created_at", "photo_urls"])
     for r in rows:
         photos = db.execute("SELECT filename FROM photos WHERE record_id = ?", (r["id"],)).fetchall()
         host = request.host_url.rstrip("/")
         urls = [f"{host}{url_for('uploaded_file', filename=p['filename'])}" for p in photos]
-        writer.writerow([r["id"], r["device_name"], r["fusion_count"], r["created_at"], " | ".join(urls)])
+        writer.writerow([r["id"], r["device_name"], r["fusion_count"], r.get("executed_on", ""), r["created_at"], " | ".join(urls)])
     return Response(si.getvalue(), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": "attachment; filename=registros_splicing.csv"})
 
 # ===== Rota de emergência para resetar senha do admin =====
@@ -893,218 +698,3 @@ def force_reset_admin():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-
-
-@app.route('/admin/workmaps', methods=['GET', 'POST'])
-def admin_workmaps():
-    if not session.get('is_admin'):
-        abort(403)
-    with closing(get_db()) as db:
-        if request.method == 'POST':
-            # Upload a new PDF
-            title = request.form.get('title') or 'Mapa de Trabalho'
-            file = request.files.get('pdf')
-            if not file or not file.filename.lower().endswith('.pdf'):
-                flash(('danger', 'Envie um arquivo PDF válido.'))
-                return redirect(url_for('admin_workmaps'))
-            fname = secure_filename(file.filename)
-            os.makedirs(WORKMAP_FOLDER, exist_ok=True)
-            dest = os.path.join(WORKMAP_FOLDER, fname)
-            file.save(dest)
-            db.execute("INSERT INTO work_maps (title, filename) VALUES (?, ?)", (title, fname))
-            db.commit()
-            flash(('success','Mapa enviado com sucesso.'))
-            return redirect(url_for('admin_workmaps'))
-        maps = db.execute("SELECT * FROM work_maps ORDER BY uploaded_at DESC").fetchall()
-        users = db.execute("SELECT id, username FROM users ORDER BY username").fetchall()
-        # get all current grants
-        grants = db.execute("SELECT user_id, work_map_id FROM user_work_map_access").fetchall()
-        grant_set = {(g['user_id'], g['work_map_id']) for g in grants}
-        return render_template('admin_workmaps.html', maps=maps, users=users, grant_set=grant_set)
-
-@app.route('/admin/workmaps/grant', methods=['POST'])
-def admin_workmaps_grant():
-    if not session.get('is_admin'):
-        abort(403)
-    user_id = request.form.get('user_id', type=int)
-    work_map_id = request.form.get('work_map_id', type=int)
-    action = request.form.get('action','grant')
-    with closing(get_db()) as db:
-        if action == 'revoke':
-            db.execute("DELETE FROM user_work_map_access WHERE user_id=? AND work_map_id=?", (user_id, work_map_id))
-        else:
-            try:
-                db.execute("INSERT OR IGNORE INTO user_work_map_access (user_id, work_map_id) VALUES (?,?)", (user_id, work_map_id))
-            except Exception:
-                pass
-        db.commit()
-    flash(('success','Permissões atualizadas.'))
-    return redirect(url_for('admin_workmaps'))
-
-@app.route('/workmaps/<int:wm_id>/download')
-def workmap_download(wm_id):
-    # Admins can download anything; users only if they have access
-    with closing(get_db()) as db:
-        wm = db.execute("SELECT * FROM work_maps WHERE id=?", (wm_id,)).fetchone()
-        if not wm:
-            abort(404)
-        if not session.get('is_admin'):
-            uid = session.get('user_id')
-            if not uid or not user_has_access_to_map(uid, wm_id):
-                abort(403)
-    return send_from_directory(WORKMAP_FOLDER, wm['filename'], as_attachment=True)
-
-
-@app.route('/records/<int:rec_id>/launch', methods=['POST'])
-def record_launch(rec_id):
-    uid = session.get('user_id')
-    if not uid:
-        return redirect(url_for('login'))
-    work_map_id = request.form.get('work_map_id', type=int)
-    # Only admin can mark as launched
-    if not session.get('is_admin'):
-        abort(403)
-    with closing(get_db()) as db:
-        # Ensure record exists
-        rec = db.execute("SELECT * FROM records WHERE id=?", (rec_id,)).fetchone()
-        if not rec:
-            abort(404)
-        # Ensure selected work_map exists
-        wm = db.execute("SELECT * FROM work_maps WHERE id=?", (work_map_id,)).fetchone()
-        if not wm:
-            flash(('danger','Selecione um Mapa de Trabalho válido.'))
-            return redirect(url_for('view_record', record_id=rec_id))
-        db.execute("UPDATE records SET status='launched', work_map_id=? WHERE id=?", (work_map_id, rec_id))
-        db.commit()
-    flash(('success','Dispositivo marcado como LANÇADO.'))
-    return redirect(url_for('view_record', record_id=rec_id))
-
-
-@app.route('/my/workmaps')
-def my_workmaps():
-    uid = session.get('user_id')
-    if not uid:
-        return redirect(url_for('login'))
-    maps = get_user_accessible_maps(uid)
-    return render_template('my_workmaps.html', maps=maps)
-
-@app.route("/healthz")
-def healthz():
-    # basic checks: can open DB and write to DATA_DIR
-    ok = True
-    checks = {}
-    # DB check
-    try:
-        db = get_db()
-        db.execute("SELECT 1").fetchone()
-        checks["db"] = "ok"
-    except Exception as e:
-        checks["db"] = f"error: {e}"
-        ok = False
-    # Disk check
-    if is_writable(DATA_DIR):
-        checks["disk"] = "ok"
-    else:
-        checks["disk"] = "not-writable"
-        ok = False
-    code = 200 if ok else 503
-    try:
-        import json
-        return app.response_class(json.dumps({"ok": ok, "checks": checks}), status=code, mimetype="application/json")
-    except Exception:
-        return ("ok" if ok else "not ok", code)
-
-
-
-@app.route("/admin/backup")
-@login_required
-@admin_required
-def admin_backup():
-    try:
-        path = backup_db()
-        flash(("success", f"Backup criado: {os.path.basename(path)}"))
-    except Exception as e:
-        flash(("danger", f"Falha ao criar backup: {e}"))
-    return redirect(url_for("admin_home"))
-
-
-
-def _schedule_daily_backup():
-    # Only start when explicitly enabled
-    if os.environ.get("AUTO_BACKUP_DAILY", "0") != "1":
-        return
-    import threading, datetime, time
-    def runner():
-        while True:
-            now = datetime.datetime.utcnow()
-            # Next run at 03:00 UTC
-            nxt = now.replace(hour=3, minute=0, second=0, microsecond=0)
-            if nxt <= now:
-                nxt += datetime.timedelta(days=1)
-            sleep_s = (nxt - now).total_seconds()
-            try:
-                time.sleep(sleep_s)
-            except Exception:
-                pass
-            try:
-                backup_db()
-            except Exception as e:
-                print("Auto-backup error:", e)
-    threading.Thread(target=runner, daemon=True).start()
-
-# Kick off auto-backup once at import time
-try:
-    _schedule_daily_backup()
-except Exception as e:
-    print("Auto-backup scheduler failed to start:", e)
-
-
-
-@app.route("/admin/backups")
-@login_required
-@admin_required
-def admin_backups():
-    files = []
-    try:
-        for name in sorted(os.listdir(BACKUP_DIR)):
-            p = os.path.join(BACKUP_DIR, name)
-            if os.path.isfile(p) and name.endswith(".db"):
-                files.append({
-                    "name": name,
-                    "size": os.path.getsize(p),
-                    "mtime": os.path.getmtime(p),
-                })
-    except Exception as e:
-        flash(("danger", f"Erro ao listar backups: {e}"))
-    return render_template("admin_backups.html", files=files)
-
-@app.route("/admin/backups/download/<path:name>")
-@login_required
-@admin_required
-def admin_backup_download(name):
-    if "/" in name or "\\" in name or not name.endswith(".db"):
-        abort(400)
-    return send_from_directory(BACKUP_DIR, name, as_attachment=True)
-
-@app.route("/admin/backups/delete/<path:name>", methods=["POST"])
-@login_required
-@admin_required
-def admin_backup_delete(name):
-    if "/" in name or "\\" in name or not name.endswith(".db"):
-        abort(400)
-    try:
-        os.remove(os.path.join(BACKUP_DIR, name))
-        flash(("success", f"Backup removido: {name}"))
-    except FileNotFoundError:
-        flash(("warning", f"Backup não encontrado: {name}"))
-    except Exception as e:
-        flash(("danger", f"Falha ao remover: {e}"))
-    return redirect(url_for("admin_backups"))
-
-@app.template_filter('datetime')
-def _fmt_dt(ts):
-    try:
-        import datetime as _dt
-        return _dt.datetime.utcfromtimestamp(int(ts)).strftime('%Y-%m-%d %H:%M UTC')
-    except Exception:
-        return str(ts)

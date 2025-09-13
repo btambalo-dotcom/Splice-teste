@@ -2,6 +2,7 @@
 {% block content %}
 <h1>Registro: {{ rec['device_name'] }}</h1>
 <p><strong>Fusões:</strong> {{ rec['fusion_count'] }}</p>
+<p><strong>Feito em:</strong> {{ rec.get('executed_on','') }}</p>
 <p><strong>Criado em:</strong> {{ rec['created_at'] }}</p>
 
 <div class="thumbs">
