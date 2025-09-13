@@ -138,6 +138,44 @@ def init_db():
 
 
 # === SCHEMA GUARD: ensure required tables/columns exist even on old DBs ===
+
+# ====== Healthcheck & Backup utilities ======
+def is_writable(path):
+    try:
+        os.makedirs(path, exist_ok=True)
+        testfile = os.path.join(path, ".write_test")
+        with open(testfile, "w") as f:
+            f.write("ok")
+        os.remove(testfile)
+        return True
+    except Exception as e:
+        try:
+            print("Writable check failed for", path, "->", e)
+        except Exception:
+            pass
+        return False
+
+BACKUP_DIR = os.path.join(DATA_DIR, "backups")
+os.makedirs(BACKUP_DIR, exist_ok=True)
+
+def backup_db():
+    # Use SQLite online backup API for consistency
+    try:
+        import datetime
+        ts = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+        dest = os.path.join(BACKUP_DIR, f"app-{ts}.db")
+        src = sqlite3.connect(DB_PATH)
+        dst = sqlite3.connect(dest)
+        with dst:
+            src.backup(dst)
+        src.close()
+        dst.close()
+        print("Backup created ->", dest)
+        return dest
+    except Exception as e:
+        print("Backup failed:", e)
+        raise
+
 SCHEMA_OK = False
 def ensure_schema():
     global SCHEMA_OK
@@ -948,3 +986,117 @@ def my_workmaps():
         return redirect(url_for('login'))
     maps = get_user_accessible_maps(uid)
     return render_template('my_workmaps.html', maps=maps)
+
+@app.route("/healthz")
+def healthz():
+    # basic checks: can open DB and write to DATA_DIR
+    ok = True
+    checks = {}
+    # DB check
+    try:
+        db = get_db()
+        db.execute("SELECT 1").fetchone()
+        checks["db"] = "ok"
+    except Exception as e:
+        checks["db"] = f"error: {e}"
+        ok = False
+    # Disk check
+    if is_writable(DATA_DIR):
+        checks["disk"] = "ok"
+    else:
+        checks["disk"] = "not-writable"
+        ok = False
+    code = 200 if ok else 503
+    try:
+        import json
+        return app.response_class(json.dumps({"ok": ok, "checks": checks}), status=code, mimetype="application/json")
+    except Exception:
+        return ("ok" if ok else "not ok", code)
+
+
+
+@app.route("/admin/backup")
+@login_required
+@admin_required
+def admin_backup():
+    try:
+        path = backup_db()
+        flash(("success", f"Backup criado: {os.path.basename(path)}"))
+    except Exception as e:
+        flash(("danger", f"Falha ao criar backup: {e}"))
+    return redirect(url_for("admin_home"))
+
+
+
+def _schedule_daily_backup():
+    # Only start when explicitly enabled
+    if os.environ.get("AUTO_BACKUP_DAILY", "0") != "1":
+        return
+    import threading, datetime, time
+    def runner():
+        while True:
+            now = datetime.datetime.utcnow()
+            # Next run at 03:00 UTC
+            nxt = now.replace(hour=3, minute=0, second=0, microsecond=0)
+            if nxt <= now:
+                nxt += datetime.timedelta(days=1)
+            sleep_s = (nxt - now).total_seconds()
+            try:
+                time.sleep(sleep_s)
+            except Exception:
+                pass
+            try:
+                backup_db()
+            except Exception as e:
+                print("Auto-backup error:", e)
+    threading.Thread(target=runner, daemon=True).start()
+
+# Kick off auto-backup once at import time
+try:
+    _schedule_daily_backup()
+except Exception as e:
+    print("Auto-backup scheduler failed to start:", e)
+
+
+
+@app.route("/admin/backups")
+@login_required
+@admin_required
+def admin_backups():
+    files = []
+    try:
+        for name in sorted(os.listdir(BACKUP_DIR)):
+            p = os.path.join(BACKUP_DIR, name)
+            if os.path.isfile(p) and name.endswith(".db"):
+                files.append({
+                    "name": name,
+                    "size": os.path.getsize(p),
+                    "mtime": os.path.getmtime(p),
+                })
+    except Exception as e:
+        flash(("danger", f"Erro ao listar backups: {e}"))
+    return render_template("admin_backups.html", files=files)
+
+@app.route("/admin/backups/download/<path:name>")
+@login_required
+@admin_required
+def admin_backup_download(name):
+    if "/" in name or "\\" in name or not name.endswith(".db"):
+        abort(400)
+    return send_from_directory(BACKUP_DIR, name, as_attachment=True)
+
+@app.route("/admin/backups/delete/<path:name>", methods=["POST"])
+@login_required
+@admin_required
+def admin_backup_delete(name):
+    if "/" in name or "\\" in name or not name.endswith(".db"):
+        abort(400)
+    try:
+        os.remove(os.path.join(BACKUP_DIR, name))
+        flash(("success", f"Backup removido: {name}"))
+    except FileNotFoundError:
+        flash(("warning", f"Backup não encontrado: {name}"))
+    except Exception as e:
+        flash(("danger", f"Falha ao remover: {e}"))
+    return redirect(url_for("admin_backups"))
+
