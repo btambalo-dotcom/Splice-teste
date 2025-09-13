@@ -10,10 +10,12 @@ from io import StringIO, BytesIO
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "uploads")
+WORKMAP_FOLDER = os.path.join(BASE_DIR, "static", "workmaps")
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 MAX_FILES_PER_RECORD = 6
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(WORKMAP_FOLDER, exist_ok=True)
 
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
@@ -27,6 +29,22 @@ def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def user_has_access_to_map(user_id, work_map_id):
+    with closing(get_db()) as db:
+        row = db.execute(
+            "SELECT 1 FROM user_work_map_access WHERE user_id=? AND work_map_id=?",
+            (user_id, work_map_id)
+        ).fetchone()
+        return row is not None
+
+def get_user_accessible_maps(user_id):
+    with closing(get_db()) as db:
+        return db.execute(
+            "SELECT wm.* FROM work_maps wm JOIN user_work_map_access a ON a.work_map_id = wm.id WHERE a.user_id=? ORDER BY wm.uploaded_at DESC",
+            (user_id,)
+        ).fetchall()
 
 def init_db():
     with closing(get_db()) as db:
@@ -58,6 +76,37 @@ def init_db():
         colnames = {c[1] for c in cols}
         if "is_admin" not in colnames:
             db.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0;")
+        db.commit()
+
+
+    # AUGMENTED: work maps and record status
+    with closing(get_db()) as db:
+        cur = db.cursor()
+        # Create tables if not exist
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS work_maps (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS user_work_map_access (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                work_map_id INTEGER NOT NULL,
+                UNIQUE(user_id, work_map_id),
+                FOREIGN KEY(user_id) REFERENCES users(id),
+                FOREIGN KEY(work_map_id) REFERENCES work_maps(id)
+            );
+        """)
+        # Add columns to records if missing
+        cols = {row[1] for row in cur.execute("PRAGMA table_info(records)").fetchall()}
+        if 'status' not in cols:
+            cur.execute("ALTER TABLE records ADD COLUMN status TEXT DEFAULT 'draft'")
+        if 'work_map_id' not in cols:
+            cur.execute("ALTER TABLE records ADD COLUMN work_map_id INTEGER REFERENCES work_maps(id)")
         db.commit()
 
 def allowed_file(filename):
@@ -681,3 +730,97 @@ def force_reset_admin():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+
+
+@app.route('/admin/workmaps', methods=['GET', 'POST'])
+def admin_workmaps():
+    if not session.get('is_admin'):
+        abort(403)
+    with closing(get_db()) as db:
+        if request.method == 'POST':
+            # Upload a new PDF
+            title = request.form.get('title') or 'Mapa de Trabalho'
+            file = request.files.get('pdf')
+            if not file or not file.filename.lower().endswith('.pdf'):
+                flash(('danger', 'Envie um arquivo PDF válido.'))
+                return redirect(url_for('admin_workmaps'))
+            fname = secure_filename(file.filename)
+            os.makedirs(WORKMAP_FOLDER, exist_ok=True)
+            dest = os.path.join(WORKMAP_FOLDER, fname)
+            file.save(dest)
+            db.execute("INSERT INTO work_maps (title, filename) VALUES (?, ?)", (title, fname))
+            db.commit()
+            flash(('success','Mapa enviado com sucesso.'))
+            return redirect(url_for('admin_workmaps'))
+        maps = db.execute("SELECT * FROM work_maps ORDER BY uploaded_at DESC").fetchall()
+        users = db.execute("SELECT id, username FROM users ORDER BY username").fetchall()
+        # get all current grants
+        grants = db.execute("SELECT user_id, work_map_id FROM user_work_map_access").fetchall()
+        grant_set = {(g['user_id'], g['work_map_id']) for g in grants}
+        return render_template('admin_workmaps.html', maps=maps, users=users, grant_set=grant_set)
+
+@app.route('/admin/workmaps/grant', methods=['POST'])
+def admin_workmaps_grant():
+    if not session.get('is_admin'):
+        abort(403)
+    user_id = request.form.get('user_id', type=int)
+    work_map_id = request.form.get('work_map_id', type=int)
+    action = request.form.get('action','grant')
+    with closing(get_db()) as db:
+        if action == 'revoke':
+            db.execute("DELETE FROM user_work_map_access WHERE user_id=? AND work_map_id=?", (user_id, work_map_id))
+        else:
+            try:
+                db.execute("INSERT OR IGNORE INTO user_work_map_access (user_id, work_map_id) VALUES (?,?)", (user_id, work_map_id))
+            except Exception:
+                pass
+        db.commit()
+    flash(('success','Permissões atualizadas.'))
+    return redirect(url_for('admin_workmaps'))
+
+@app.route('/workmaps/<int:wm_id>/download')
+def workmap_download(wm_id):
+    # Admins can download anything; users only if they have access
+    with closing(get_db()) as db:
+        wm = db.execute("SELECT * FROM work_maps WHERE id=?", (wm_id,)).fetchone()
+        if not wm:
+            abort(404)
+        if not session.get('is_admin'):
+            uid = session.get('user_id')
+            if not uid or not user_has_access_to_map(uid, wm_id):
+                abort(403)
+    return send_from_directory(WORKMAP_FOLDER, wm['filename'], as_attachment=True)
+
+
+@app.route('/records/<int:rec_id>/launch', methods=['POST'])
+def record_launch(rec_id):
+    uid = session.get('user_id')
+    if not uid:
+        return redirect(url_for('login'))
+    work_map_id = request.form.get('work_map_id', type=int)
+    # Only admin can mark as launched
+    if not session.get('is_admin'):
+        abort(403)
+    with closing(get_db()) as db:
+        # Ensure record exists
+        rec = db.execute("SELECT * FROM records WHERE id=?", (rec_id,)).fetchone()
+        if not rec:
+            abort(404)
+        # Ensure selected work_map exists
+        wm = db.execute("SELECT * FROM work_maps WHERE id=?", (work_map_id,)).fetchone()
+        if not wm:
+            flash(('danger','Selecione um Mapa de Trabalho válido.'))
+            return redirect(url_for('view_record', record_id=rec_id))
+        db.execute("UPDATE records SET status='launched', work_map_id=? WHERE id=?", (work_map_id, rec_id))
+        db.commit()
+    flash(('success','Dispositivo marcado como LANÇADO.'))
+    return redirect(url_for('view_record', record_id=rec_id))
+
+
+@app.route('/my/workmaps')
+def my_workmaps():
+    uid = session.get('user_id')
+    if not uid:
+        return redirect(url_for('login'))
+    maps = get_user_accessible_maps(uid)
+    return render_template('my_workmaps.html', maps=maps)
