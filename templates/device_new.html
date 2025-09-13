@@ -1,0 +1,21 @@
+
+{% extends "base.html" %}
+{% block content %}
+  <h2>Lançar Dispositivo</h2>
+  <form method="post" enctype="multipart/form-data">
+    <label>Nome do dispositivo <input name="label" placeholder="Ex.: Caixa de Emenda #102" required></label>
+    <label>Mapa de Trabalho (PDF)
+      <select name="map_id" required>
+        <option value="">— selecione —</option>
+        {% for m in maps %}
+          <option value="{{m.id}}">{{m.title}}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Fotos (até 5) <input type="file" name="photos" accept="image/*" multiple></label>
+    <button type="submit">Salvar</button>
+  </form>
+  {% if not maps %}
+    <p><em>Você ainda não tem mapas atribuídos. Solicite acesso a um administrador.</em></p>
+  {% endif %}
+{% endblock %}

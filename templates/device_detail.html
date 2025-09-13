@@ -1,0 +1,17 @@
+
+{% extends "base.html" %}
+{% block content %}
+  <h2>Dispositivo #{{d.id}} — {{d.label}}</h2>
+  <p><strong>Status:</strong> {{d.status}} | <strong>Criado por:</strong> {{d.creator}} | <strong>Mapa:</strong> {{d.map_title}}</p>
+  {% if session.get('is_admin') and d.status != 'Launched' %}
+    <form method="post" action="{{ url_for('admin_mark_launched', device_id=d.id) }}">
+      <button type="submit">Marcar como Lançado</button>
+    </form>
+  {% endif %}
+  <h3>Fotos</h3>
+  {% for p in photos %}
+    <img class="thumb" src="{{ url_for('static', filename='uploads/photos/' + p.filename) }}" alt="foto {{loop.index}}">
+  {% else %}
+    <p><em>Nenhuma foto enviada.</em></p>
+  {% endfor %}
+{% endblock %}

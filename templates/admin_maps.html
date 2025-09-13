@@ -1,19 +1,45 @@
-{% extends 'base.html' %}{% block content %}
-<h4>Mapas de Trabalho (PDF)</h4>
-<form method="post" enctype="multipart/form-data" class="card p-3 mb-3">
-  <div class="row g-2">
-    <div class="col-md-6"><input class="form-control" name="title" placeholder="Título" required></div>
-    <div class="col-md-6"><input class="form-control" type="file" name="pdf" accept="application/pdf" required></div>
-  </div>
-  <button class="btn btn-primary mt-2">Adicionar mapa</button>
-</form>
-<table class="table table-sm"><thead><tr><th>Título</th><th>Download</th></tr></thead>
-<tbody>{% for m in maps %}<tr><td>{{ m.title }}</td><td><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('download_map', map_id=m.id) }}">Baixar</a></td></tr>{% else %}<tr><td colspan="2">Nenhum mapa</td></tr>{% endfor %}</tbody></table>
-<h5 class="mt-4">Atribuir mapa a usuários</h5>
-<form method="post" action="{{ url_for('assign_map') }}" class="card p-3">
-  <div class="row g-2">
-    <div class="col-md-4"><select class="form-select" name="map_id" required>{% for m in maps %}<option value="{{ m.id }}">{{ m.title }}</option>{% endfor %}</select></div>
-    <div class="col-md-8"><select class="form-select" name="user_ids" multiple size="6" required>{% for u in users %}<option value="{{ u.id }}">{{ u.username }}</option>{% endfor %}</select></div>
-  </div>
-  <button class="btn btn-primary mt-2">Atribuir</button>
-</form>{% endblock %}
+
+{% extends "base.html" %}
+{% block content %}
+  <h2>Mapas</h2>
+  <h3>Enviar novo PDF</h3>
+  <form method="post" enctype="multipart/form-data">
+    <label>Título <input name="title" placeholder="Ex.: Mapa Hub Central 07/2025" required></label>
+    <label>Arquivo PDF <input type="file" name="pdf" accept="application/pdf" required></label>
+    <button type="submit">Enviar</button>
+  </form>
+
+  <h3>Mapas existentes</h3>
+  <ul>
+    {% for m in maps %}
+      <li>#{{m.id}} — {{m.title}} ({{m.filename}})</li>
+    {% else %}
+      <li><em>Nenhum mapa enviado ainda.</em></li>
+    {% endfor %}
+  </ul>
+
+  <h3>Atribuir acesso</h3>
+  <form method="post" action="{{ url_for('admin_maps_assign') }}">
+    <label>Usuário
+      <select name="user_id">
+        {% for u in users %}
+          <option value="{{u.id}}">{{u.name}} ({{u.email}})</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Mapa
+      <select name="map_id">
+        {% for m in maps %}
+          <option value="{{m.id}}">{{m.title}}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Ação
+      <select name="action">
+        <option value="grant">Conceder</option>
+        <option value="revoke">Revogar</option>
+      </select>
+    </label>
+    <button type="submit">Aplicar</button>
+  </form>
+{% endblock %}

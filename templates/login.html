@@ -1,8 +1,10 @@
-{% extends 'base.html' %}{% block content %}
-<h3>Entrar</h3>
-<form method="post" class="card card-body">
-  <div class="mb-3"><label class="form-label">Usuário</label><input class="form-control" name="username" required></div>
-  <div class="mb-3"><label class="form-label">Senha</label><input class="form-control" type="password" name="password" required></div>
-  <button class="btn btn-primary">Entrar</button>
-  <a class="btn btn-outline-secondary mt-2" href="{{ url_for('register') }}">Cadastrar (somente se não houver usuário)</a>
-</form>{% endblock %}
+
+{% extends "base.html" %}
+{% block content %}
+  <h2>Entrar</h2>
+  <form method="post">
+    <label>E-mail <input name="email" type="email" required></label>
+    <label>Senha <input name="password" type="password" required></label>
+    <button type="submit">Acessar</button>
+  </form>
+{% endblock %}
