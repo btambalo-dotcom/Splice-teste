@@ -134,6 +134,54 @@ def init_db():
             cur.execute("ALTER TABLE records ADD COLUMN work_map_id INTEGER REFERENCES work_maps(id)")
         db.commit()
 
+
+# === SCHEMA GUARD: ensure required tables/columns exist even on old DBs ===
+SCHEMA_OK = False
+def ensure_schema():
+    global SCHEMA_OK
+    if SCHEMA_OK:
+        return
+    try:
+        with closing(get_db()) as db:
+            cur = db.cursor()
+            # Create tables needed for maps/access
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS work_maps (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    filename TEXT NOT NULL,
+                    uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS user_work_map_access (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    work_map_id INTEGER NOT NULL,
+                    UNIQUE(user_id, work_map_id),
+                    FOREIGN KEY(user_id) REFERENCES users(id),
+                    FOREIGN KEY(work_map_id) REFERENCES work_maps(id)
+                );
+            """)
+            # Add columns to records if missing
+            cols = {row[1] for row in cur.execute("PRAGMA table_info(records)").fetchall()}
+            if 'status' not in cols:
+                cur.execute("ALTER TABLE records ADD COLUMN status TEXT DEFAULT 'draft'")
+            if 'work_map_id' not in cols:
+                cur.execute("ALTER TABLE records ADD COLUMN work_map_id INTEGER REFERENCES work_maps(id)")
+            db.commit()
+        SCHEMA_OK = True
+    except Exception as e:
+        # Don't block the request; just print for logs
+        try:
+            print("ensure_schema warning:", e)
+        except Exception:
+            pass
+
+@app.before_request
+def _ensure_schema_before_request():
+    ensure_schema()
+
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
