@@ -327,35 +327,47 @@ def new_record():
         return redirect(url_for("dashboard"))
     return render_template("new_record.html", maps=maps)
     
+
 @app.route("/record/<int:record_id>")
 @login_required
 def view_record(record_id):
     db = get_db()
-    # Join with users to get author; include status/work_map_id if columns exist
-    # Safe for older DBs: columns may not exist yet on very first run
+    uid = session.get('user_id')
+    is_admin = bool(session.get('is_admin'))
+
+    # 1) Try the full query with status/work_map_id and author
+    rec = None
     try:
         rec = db.execute(
             "SELECT r.id, r.device_name, r.fusion_count, r.created_at, r.status, r.work_map_id, u.username AS author "
             "FROM records r JOIN users u ON u.id = r.user_id "
-            "WHERE r.id = ? AND (r.user_id = ? OR ?)", 
-            (record_id, session['user_id'], 1 if session.get('is_admin') else 0)
+            "WHERE r.id = ? AND (r.user_id = ? OR ?)",
+            (record_id, uid, 1 if is_admin else 0)
         ).fetchone()
-    except Exception:
-        # Fallback if status/work_map_id not present yet
-        rec = db.execute(
-            "SELECT r.id, r.device_name, r.fusion_count, r.created_at, NULL as status, NULL as work_map_id, u.username AS author "
-            "FROM records r JOIN users u ON u.id = r.user_id "
-            "WHERE r.id = ? AND (r.user_id = ? OR ?)", 
-            (record_id, session['user_id'], 1 if session.get('is_admin') else 0)
-        ).fetchone()
+    except Exception as e:
+        try:
+            # 2) Fallback without new columns
+            rec = db.execute(
+                "SELECT r.id, r.device_name, r.fusion_count, r.created_at, u.username AS author "
+                "FROM records r JOIN users u ON u.id = r.user_id "
+                "WHERE r.id = ? AND (r.user_id = ? OR ?)",
+                (record_id, uid, 1 if is_admin else 0)
+            ).fetchone()
+        except Exception as _:
+            rec = None
 
     if not rec:
         abort(404)
 
-    photos = db.execute("SELECT id, filename FROM photos WHERE record_id = ?", (record_id,)).fetchall()
+    # photos (defensive)
+    try:
+        photos = db.execute("SELECT id, filename FROM photos WHERE record_id = ?", (record_id,)).fetchall()
+    except Exception:
+        photos = []
 
+    # maps for admin (defensive)
     maps_for_admin = []
-    if session.get('is_admin'):
+    if is_admin:
         try:
             maps_for_admin = db.execute("SELECT * FROM work_maps ORDER BY uploaded_at DESC").fetchall()
         except Exception:
