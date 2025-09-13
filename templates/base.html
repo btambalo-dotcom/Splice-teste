@@ -1,47 +1,36 @@
-
 <!doctype html>
-<html lang="pt-BR">
-  <head>
-    <meta charset="utf-8">
-    <title>Splice Admin</title>
-    <link rel="stylesheet" href="https://unpkg.com/missing.css">
-    <style>
-      body { max-width: 980px; margin: 2rem auto; }
-      .flash { padding: .6rem 1rem; border: 1px solid #ccc; margin: .4rem 0; }
-      .error { background:#ffe6e6; }
-      .success { background:#e6ffef; }
-      nav a { margin-right: 1rem; }
-      img.thumb { max-width: 200px; display:block; margin:.4rem 0; border:1px solid #ddd; padding:2px; }
-      table { width:100%; border-collapse: collapse; }
-      th, td { border: 1px solid #ddd; padding: .5rem; }
-      form { margin: .6rem 0; }
-      label { display:block; margin:.3rem 0; }
-      header h1 { margin: 0 0 .5rem 0; }
-    </style>
-  </head>
-  <body>
-    <header>
-      <h1>Splice Admin</h1>
-      {% if session.get('user_id') %}
-        <nav>
-          <a href="{{ url_for('index') }}">Início</a>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Splice Admin App{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div><strong>Splice Admin App</strong></div>
+      <nav>
+        {% if session.get('user_id') %}
+          <span>Olá, {{ session.get('username') }}{% if session.get('is_admin') %} (admin){% endif %}</span>
+          <a href="{{ url_for('dashboard') }}">Dashboard</a>
+          <a href="{{ url_for('new_record') }}">Novo Registro</a>
           {% if session.get('is_admin') %}
-            <a href="{{ url_for('admin_reports') }}">Relatórios</a>
-            <a href="{{ url_for('admin_maps') }}">Mapas</a>
-          {% else %}
-            <a href="{{ url_for('new_device') }}">Lançar Dispositivo</a>
+            <a href="{{ url_for('admin_home') }}">Admin</a>
           {% endif %}
           <a href="{{ url_for('logout') }}">Sair</a>
-        </nav>
-      {% endif %}
-    </header>
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for cat, msg in messages %}
-          <div class="flash {{ cat }}">{{ msg }}</div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
+        {% else %}
+          <a href="{{ url_for('login') }}">Entrar</a>
+          <a href="{{ url_for('register') }}">Cadastrar</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+  <div class="container">
+    {% for cat, msg in (get_flashed_messages(with_categories=True) or []) %}
+      <div class="flash {{ cat }}">{{ msg }}</div>
+    {% endfor %}
     {% block content %}{% endblock %}
-  </body>
+  </div>
+</body>
 </html>
