@@ -255,7 +255,6 @@ def new_record():
     return render_template("new_record.html", maps=maps)
     
 @app.route(
-
 @app.route("/record/<int:record_id>")
 @login_required
 def view_record(record_id):
@@ -292,7 +291,6 @@ def view_record(record_id):
 
     return render_template("view_record.html", rec=rec, photos=photos, maps_for_admin=maps_for_admin)
     
-@app.route("/uploads/<path:filename>")
 
 @app.route("/uploads/<path:filename>")
 @login_required
