@@ -28,6 +28,7 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
+
 def init_db():
     with closing(get_db()) as db:
         db.executescript("""
@@ -55,17 +56,19 @@ def init_db():
                 FOREIGN KEY(record_id) REFERENCES records(id)
             );
         """)
+
+        # Garantias de colunas existentes (migração leve)
         cols = db.execute("PRAGMA table_info(users)").fetchall()
         colnames = {c[1] for c in cols}
         if "is_admin" not in colnames:
             db.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0;")
-        
+
         cols = db.execute("PRAGMA table_info(records)").fetchall()
         colnames = {c[1] for c in cols}
         if "executed_on" not in colnames:
             db.execute("ALTER TABLE records ADD COLUMN executed_on DATE DEFAULT (DATE('now'));")
-db.commit()
 
+        db.commit()
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
