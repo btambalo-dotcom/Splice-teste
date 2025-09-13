@@ -4,7 +4,7 @@ from flask import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-import os, sqlite3, csv
+import os, sqlite3, csv, zipfile
 from contextlib import closing
 from io import StringIO, BytesIO
 
@@ -92,15 +92,19 @@ def admin_required(view):
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
+    db = get_db()
+    total_users = db.execute("SELECT COUNT(1) FROM users").fetchone()[0]
+    if total_users > 0:
+        flash("Registro desativado. Apenas o administrador pode criar novos usuários.", "error")
+        return redirect(url_for("login"))
+
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
         if not username or not password:
             flash("Preencha todos os campos.", "error")
             return redirect(url_for("register"))
-        db = get_db()
-        total_users = db.execute("SELECT COUNT(1) FROM users").fetchone()[0]
-        is_admin = 1 if total_users == 0 else 0
+        is_admin = 1
         pw_hash = generate_password_hash(password)
         try:
             db.execute("INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, ?)", (username, pw_hash, is_admin))
@@ -332,6 +336,7 @@ def admin_export_csv():
 
 # ===== Relatórios com filtros + gráficos + XLSX =====
 from datetime import datetime
+
 @app.route("/admin/reports", methods=["GET"])
 @admin_required
 def admin_reports():
@@ -360,22 +365,19 @@ def admin_reports():
         tuple(params),
     ).fetchone()["total"] or 0
 
-    
-# Totais por usuário (dispositivos distintos, registros e soma de fusões)
-users_summary = db.execute(
-    f"SELECT u.id, u.username, "
-    f"COUNT(DISTINCT r.device_name) AS devices, "
-    f"COUNT(r.id) AS registros, "
-    f"COALESCE(SUM(r.fusion_count), 0) AS fusoes "
-    f"FROM records r JOIN users u ON u.id = r.user_id "
-    f"{where_sql} "
-    f"GROUP BY u.id, u.username "
-    f"ORDER BY fusoes DESC, devices DESC",
-    tuple(params),
-).fetchall()
+    users_summary = db.execute(
+        f"SELECT u.id, u.username, "
+        f"COUNT(DISTINCT r.device_name) AS devices, "
+        f"COUNT(r.id) AS registros, "
+        f"COALESCE(SUM(r.fusion_count), 0) AS fusoes "
+        f"FROM records r JOIN users u ON u.id = r.user_id "
+        f"{where_sql} "
+        f"GROUP BY u.id, u.username "
+        f"ORDER BY fusoes DESC, devices DESC",
+        tuple(params),
+    ).fetchall()
 
-devices = db.execute(
-
+    devices = db.execute(
         f"SELECT r.device_name, COUNT(*) as registros, SUM(r.fusion_count) as fusoes "
         f"FROM records r {where_sql} GROUP BY r.device_name ORDER BY fusoes DESC, registros DESC",
         tuple(params),
@@ -407,22 +409,7 @@ def admin_reports_data():
     where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
     db = get_db()
 
-    
-# Per-user summary
-users_summary = db.execute(
-    f"SELECT u.id, u.username, "
-    f"COUNT(DISTINCT r.device_name) AS devices, "
-    f"COUNT(r.id) AS registros, "
-    f"COALESCE(SUM(r.fusion_count), 0) AS fusoes "
-    f"FROM records r JOIN users u ON u.id = r.user_id "
-    f"{where_sql} "
-    f"GROUP BY u.id, u.username "
-    f"ORDER BY fusoes DESC, devices DESC",
-    tuple(params),
-).fetchall()
-
-by_day = db.execute(
-
+    by_day = db.execute(
         f"SELECT date(r.created_at) as d, SUM(r.fusion_count) as total FROM records r {where_sql} GROUP BY date(r.created_at) ORDER BY d ASC",
         tuple(params),
     ).fetchall()
@@ -437,45 +424,7 @@ by_day = db.execute(
     total_fusions = sum(item["sum"] for item in by_day_list)
     return {"by_day": by_day_list, "by_device": by_device_list, "total_fusions": total_fusions}
 
-
-@app.route("/admin/reports_users.csv")
-@admin_required
-def admin_reports_users_csv():
-    start_str = request.args.get("start", "").strip()
-    end_str = request.args.get("end", "").strip()
-    user_id = request.args.get("user_id", type=int)
-
-    clauses = []; params = []
-    if start_str:
-        clauses.append("date(r.created_at) >= date(?)"); params.append(start_str)
-    if end_str:
-        clauses.append("date(r.created_at) <= date(?)"); params.append(end_str)
-    if user_id:
-        clauses.append("r.user_id = ?"); params.append(user_id)
-    where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
-
-    db = get_db()
-    rows = db.execute(
-        f"SELECT u.id, u.username, "
-        f"COUNT(DISTINCT r.device_name) AS devices, "
-        f"COUNT(r.id) AS registros, "
-        f"COALESCE(SUM(r.fusion_count), 0) AS fusoes "
-        f"FROM records r JOIN users u ON u.id = r.user_id "
-        f"{where_sql} "
-        f"GROUP BY u.id, u.username "
-        f"ORDER BY fusoes DESC, devices DESC",
-        tuple(params),
-    ).fetchall()
-
-    si = StringIO(); writer = csv.writer(si)
-    writer.writerow(["user_id", "username", "devices_distintos", "registros", "fusoes"])
-    for r in rows:
-        writer.writerow([r["id"], r["username"], r["devices"], r["registros"], r["fusoes"]])
-    return Response(si.getvalue(), mimetype="text/csv; charset=utf-8",
-                    headers={"Content-Disposition": "attachment; filename=relatorio_por_usuario.csv"})
-
 @app.route("/admin/reports.csv")
-
 @admin_required
 def admin_reports_csv():
     start_str = request.args.get("start", "").strip()
@@ -501,6 +450,35 @@ def admin_reports_csv():
         writer.writerow([r["id"], r["username"], r["device_name"], r["fusion_count"], r["created_at"]])
     return Response(si.getvalue(), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": "attachment; filename=relatorio_admin.csv"})
 
+@app.route("/admin/reports_users.csv")
+@admin_required
+def admin_reports_users_csv():
+    start_str = request.args.get("start", "").strip()
+    end_str = request.args.get("end", "").strip()
+    user_id = request.args.get("user_id", type=int)
+
+    clauses = []; params = []
+    if start_str:
+        clauses.append("date(r.created_at) >= date(?)"); params.append(start_str)
+    if end_str:
+        clauses.append("date(r.created_at) <= date(?)"); params.append(end_str)
+    if user_id:
+        clauses.append("r.user_id = ?"); params.append(user_id)
+    where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+
+    db = get_db()
+    rows = db.execute(
+        f"SELECT u.id, u.username, COUNT(DISTINCT r.device_name) AS devices, COUNT(r.id) AS registros, COALESCE(SUM(r.fusion_count), 0) AS fusoes "
+        f"FROM records r JOIN users u ON u.id = r.user_id {where_sql} GROUP BY u.id, u.username ORDER BY fusoes DESC, devices DESC",
+        tuple(params),
+    ).fetchall()
+
+    si = StringIO(); writer = csv.writer(si)
+    writer.writerow(["user_id", "username", "devices_distintos", "registros", "fusoes"])
+    for r in rows:
+        writer.writerow([r["id"], r["username"], r["devices"], r["registros"], r["fusoes"]])
+    return Response(si.getvalue(), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": "attachment; filename=relatorio_por_usuario.csv"})
+
 @app.route("/admin/reports.xlsx")
 @admin_required
 def admin_reports_xlsx():
@@ -522,41 +500,16 @@ def admin_reports_xlsx():
         f"SELECT r.id, u.username, r.device_name, r.fusion_count, r.created_at FROM records r JOIN users u ON u.id = r.user_id {where_sql} ORDER BY r.created_at DESC",
         tuple(params),
     ).fetchall()
-    
-# Totais por usuário (dispositivos distintos, registros e soma de fusões)
-users_summary = db.execute(
-    f"SELECT u.id, u.username, "
-    f"COUNT(DISTINCT r.device_name) AS devices, "
-    f"COUNT(r.id) AS registros, "
-    f"COALESCE(SUM(r.fusion_count), 0) AS fusoes "
-    f"FROM records r JOIN users u ON u.id = r.user_id "
-    f"{where_sql} "
-    f"GROUP BY u.id, u.username "
-    f"ORDER BY fusoes DESC, devices DESC",
-    tuple(params),
-).fetchall()
-
-devices = db.execute(
-
+    devices = db.execute(
         f"SELECT r.device_name, COUNT(*) as registros, SUM(r.fusion_count) as fusoes FROM records r {where_sql} GROUP BY r.device_name ORDER BY fusoes DESC",
         tuple(params),
     ).fetchall()
-    
-# Per-user summary
-users_summary = db.execute(
-    f"SELECT u.id, u.username, "
-    f"COUNT(DISTINCT r.device_name) AS devices, "
-    f"COUNT(r.id) AS registros, "
-    f"COALESCE(SUM(r.fusion_count), 0) AS fusoes "
-    f"FROM records r JOIN users u ON u.id = r.user_id "
-    f"{where_sql} "
-    f"GROUP BY u.id, u.username "
-    f"ORDER BY fusoes DESC, devices DESC",
-    tuple(params),
-).fetchall()
-
-by_day = db.execute(
-
+    users_summary = db.execute(
+        f"SELECT u.id, u.username, COUNT(DISTINCT r.device_name) AS devices, COUNT(r.id) AS registros, COALESCE(SUM(r.fusion_count), 0) AS fusoes "
+        f"FROM records r JOIN users u ON u.id = r.user_id {where_sql} GROUP BY u.id, u.username ORDER BY fusoes DESC, devices DESC",
+        tuple(params),
+    ).fetchall()
+    by_day = db.execute(
         f"SELECT date(r.created_at) as d, SUM(r.fusion_count) as total FROM records r {where_sql} GROUP BY date(r.created_at) ORDER BY d ASC",
         tuple(params),
     ).fetchall()
@@ -579,16 +532,14 @@ by_day = db.execute(
         v = r["total"] or 0
         total += v
         ws3.append([r["d"], v])
-    ws3.append([]); 
-ws3.append(["TOTAL", total])
+    ws3.append([]); ws3.append(["TOTAL", total])
 
-ws4 = wb.create_sheet("Por Usuário")
-ws4.append(["user_id", "username", "devices_distintos", "registros", "fusoes"])
-for r in users_summary:
-    ws4.append([r["id"], r["username"], r["devices"], r["registros"], r["fusoes"]])
+    ws4 = wb.create_sheet("Por Usuário")
+    ws4.append(["user_id", "username", "devices_distintos", "registros", "fusoes"])
+    for r in users_summary:
+        ws4.append([r["id"], r["username"], r["devices"], r["registros"], r["fusoes"]])
 
-
-    for ws in [ws1, ws2, ws3]:
+    for ws in [ws1, ws2, ws3, ws4]:
         for col in ws.columns:
             from openpyxl.utils import get_column_letter
             col_letter = get_column_letter(col[0].column)
@@ -599,36 +550,15 @@ for r in users_summary:
     return Response(bio.getvalue(), mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": "attachment; filename=relatorio_admin.xlsx"})
 
-# ===== Export do usuário =====
-@app.route("/export.csv")
-@login_required
-def export_csv():
-    db = get_db()
-    rows = db.execute(
-        "SELECT id, device_name, fusion_count, created_at FROM records WHERE user_id = ? ORDER BY created_at DESC",
-        (session["user_id"],),
-    ).fetchall()
-    si = StringIO(); writer = csv.writer(si)
-    writer.writerow(["id", "device_name", "fusion_count", "created_at", "photo_urls"])
-    for r in rows:
-        photos = db.execute("SELECT filename FROM photos WHERE record_id = ?", (r["id"],)).fetchall()
-        host = request.host_url.rstrip("/")
-        urls = [f"{host}{url_for('uploaded_file', filename=p['filename'])}" for p in photos]
-        writer.writerow([r["id"], r["device_name"], r["fusion_count"], r["created_at"], " | ".join(urls)])
-    return Response(si.getvalue(), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": "attachment; filename=registros_splicing.csv"})
-
-
+# ===== Download de fotos em ZIP por dispositivo =====
 @app.route("/admin/photos", methods=["GET", "POST"])
 @admin_required
 def admin_photos():
-    """Tela para selecionar dispositivos e baixar fotos em ZIP.
-       Filtros: start, end, user_id (iguais ao /admin/reports)."""
     start_str = request.args.get("start", "").strip()
     end_str = request.args.get("end", "").strip()
     user_id = request.args.get("user_id", type=int)
 
-    clauses = []
-    params = []
+    clauses = []; params = []
     if start_str:
         clauses.append("date(r.created_at) >= date(?)"); params.append(start_str)
     if end_str:
@@ -638,23 +568,7 @@ def admin_photos():
     where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
 
     db = get_db()
-    # Dispositivos distintos com contagem de fotos
-    
-# Totais por usuário (dispositivos distintos, registros e soma de fusões)
-users_summary = db.execute(
-    f"SELECT u.id, u.username, "
-    f"COUNT(DISTINCT r.device_name) AS devices, "
-    f"COUNT(r.id) AS registros, "
-    f"COALESCE(SUM(r.fusion_count), 0) AS fusoes "
-    f"FROM records r JOIN users u ON u.id = r.user_id "
-    f"{where_sql} "
-    f"GROUP BY u.id, u.username "
-    f"ORDER BY fusoes DESC, devices DESC",
-    tuple(params),
-).fetchall()
-
-devices = db.execute(
-
+    devices = db.execute(
         f"""
         SELECT r.device_name,
                COUNT(DISTINCT r.id) as registros,
@@ -664,42 +578,32 @@ devices = db.execute(
         {where_sql}
         GROUP BY r.device_name
         ORDER BY fotos DESC, registros DESC
-        """
-        , tuple(params)
+        """,
+        tuple(params)
     ).fetchall()
 
     users = db.execute("SELECT id, username FROM users ORDER BY username ASC").fetchall()
+    return render_template("admin_photos.html", devices=devices, users=users, selected_user_id=user_id, start=start_str, end=end_str)
 
-    return render_template("admin_photos.html",
-                           devices=devices,
-                           users=users,
-                           selected_user_id=user_id,
-                           start=start_str, end=end_str)
-
-from io import BytesIO
 @app.route("/admin/photos.zip", methods=["POST"])
 @admin_required
 def admin_photos_zip():
-    """Gera um ZIP com as fotos dos dispositivos selecionados considerando filtros."""
-    # Filtros recebidos via form
     start_str = request.form.get("start", "").strip()
     end_str = request.form.get("end", "").strip()
     user_id = request.form.get("user_id", type=int)
-    selected = request.form.getlist("devices")  # lista de device_name selecionados
+    selected = request.form.getlist("devices")
 
     if not selected:
         flash("Selecione pelo menos um dispositivo.", "error")
         return redirect(url_for("admin_photos", start=start_str, end=end_str, user_id=user_id))
 
-    clauses = []
-    params = []
+    clauses = []; params = []
     if start_str:
         clauses.append("date(r.created_at) >= date(?)"); params.append(start_str)
     if end_str:
         clauses.append("date(r.created_at) <= date(?)"); params.append(end_str)
     if user_id:
         clauses.append("r.user_id = ?"); params.append(user_id)
-    # filtro por dispositivos selecionados (placeholders)
     in_clause = " OR ".join(["r.device_name = ?"] * len(selected))
     clauses.append(f"({in_clause})"); params.extend(selected)
 
@@ -718,7 +622,6 @@ def admin_photos_zip():
         tuple(params)
     ).fetchall()
 
-    # Cria ZIP em memória
     bio = BytesIO()
     with zipfile.ZipFile(bio, "w", zipfile.ZIP_DEFLATED) as z:
         base_upload = app.config.get("UPLOAD_FOLDER")
@@ -726,10 +629,8 @@ def admin_photos_zip():
             device = row["device_name"]
             rec_id = row["record_id"]
             filename = row["filename"]
-            # caminho físico
             fpath = os.path.join(base_upload, filename)
             if os.path.isfile(fpath):
-                # caminho dentro do zip: device/record_<id>/filename
                 arcname = f"{device}/record_{rec_id}/{filename}"
                 z.write(fpath, arcname)
     bio.seek(0)
@@ -739,6 +640,44 @@ def admin_photos_zip():
         mimetype="application/zip",
         headers={"Content-Disposition": f"attachment; filename={fname}"}
     )
+
+# ===== Export do usuário (pessoal) =====
+@app.route("/export.csv")
+@login_required
+def export_csv():
+    db = get_db()
+    rows = db.execute(
+        "SELECT id, device_name, fusion_count, created_at FROM records WHERE user_id = ? ORDER BY created_at DESC",
+        (session["user_id"],),
+    ).fetchall()
+    si = StringIO(); writer = csv.writer(si)
+    writer.writerow(["id", "device_name", "fusion_count", "created_at", "photo_urls"])
+    for r in rows:
+        photos = db.execute("SELECT filename FROM photos WHERE record_id = ?", (r["id"],)).fetchall()
+        host = request.host_url.rstrip("/")
+        urls = [f"{host}{url_for('uploaded_file', filename=p['filename'])}" for p in photos]
+        writer.writerow([r["id"], r["device_name"], r["fusion_count"], r["created_at"], " | ".join(urls)])
+    return Response(si.getvalue(), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": "attachment; filename=registros_splicing.csv"})
+
+# ===== Rota de emergência para resetar senha do admin =====
+@app.route("/force_reset_admin")
+def force_reset_admin():
+    # Controle por variáveis de ambiente
+    if os.environ.get("FORCE_RESET_ADMIN", "0") != "1":
+        return "Desativado", 403
+    token = request.args.get("token", "")
+    expected = os.environ.get("RESET_ADMIN_TOKEN", "")
+    if not token or token != expected:
+        return "Token inválido", 403
+    new_pw = os.environ.get("NEW_ADMIN_PASSWORD", "nova123")
+    db = get_db()
+    # Reseta a senha do primeiro admin encontrado
+    row = db.execute("SELECT id FROM users WHERE is_admin = 1 ORDER BY id ASC LIMIT 1").fetchone()
+    if not row:
+        return "Nenhum admin encontrado", 404
+    db.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(new_pw), row["id"]))
+    db.commit()
+    return f"Senha do admin (id={row['id']}) resetada para: {new_pw}"
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
