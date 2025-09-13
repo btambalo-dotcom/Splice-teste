@@ -244,15 +244,44 @@ def new_record():
         return redirect(url_for("dashboard"))
     return render_template("new_record.html")
 
+
 @app.route("/record/<int:record_id>")
 @login_required
 def view_record(record_id):
     db = get_db()
-    rec = db.execute("SELECT id, device_name, fusion_count, created_at FROM records WHERE id = ? AND user_id = ?", (record_id, session["user_id"])).fetchone()
+    # Join with users to get author; include status/work_map_id if columns exist
+    # Safe for older DBs: columns may not exist yet on very first run
+    try:
+        rec = db.execute(
+            "SELECT r.id, r.device_name, r.fusion_count, r.created_at, r.status, r.work_map_id, u.username AS author "
+            "FROM records r JOIN users u ON u.id = r.user_id "
+            "WHERE r.id = ? AND (r.user_id = ? OR ?)", 
+            (record_id, session['user_id'], 1 if session.get('is_admin') else 0)
+        ).fetchone()
+    except Exception:
+        # Fallback if status/work_map_id not present yet
+        rec = db.execute(
+            "SELECT r.id, r.device_name, r.fusion_count, r.created_at, NULL as status, NULL as work_map_id, u.username AS author "
+            "FROM records r JOIN users u ON u.id = r.user_id "
+            "WHERE r.id = ? AND (r.user_id = ? OR ?)", 
+            (record_id, session['user_id'], 1 if session.get('is_admin') else 0)
+        ).fetchone()
+
     if not rec:
         abort(404)
+
     photos = db.execute("SELECT id, filename FROM photos WHERE record_id = ?", (record_id,)).fetchall()
-    return render_template("view_record.html", rec=rec, photos=photos)
+
+    maps_for_admin = []
+    if session.get('is_admin'):
+        try:
+            maps_for_admin = db.execute("SELECT * FROM work_maps ORDER BY uploaded_at DESC").fetchall()
+        except Exception:
+            maps_for_admin = []
+
+    return render_template("view_record.html", rec=rec, photos=photos, maps_for_admin=maps_for_admin)
+    
+@app.route("/uploads/<path:filename>")
 
 @app.route("/uploads/<path:filename>")
 @login_required
