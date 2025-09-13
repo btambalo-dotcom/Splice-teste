@@ -77,6 +77,23 @@ def init_db():
         if "is_admin" not in colnames:
             db.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0;")
         db.commit()
+    # AUGMENTED: default admin
+    with closing(get_db()) as db:
+        cur = db.cursor()
+        row = cur.execute(\"SELECT id FROM users WHERE username=?\", (\"admin\",)).fetchone()
+        if not row:
+            from werkzeug.security import generate_password_hash
+            cur.execute(\"INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)\", (\"admin\", generate_password_hash(\"admin123\")))
+            db.commit()
+
+    # AUGMENTED: create default admin
+    with closing(get_db()) as db:
+        cur = db.cursor()
+        row = cur.execute("SELECT id FROM users WHERE username='admin'").fetchone()
+        if not row:
+            from werkzeug.security import generate_password_hash
+            cur.execute("INSERT INTO users (username, password, is_admin) VALUES (?,?,1)", ('admin', generate_password_hash('admin123')))
+            db.commit()
 
 
     # AUGMENTED: work maps and record status
@@ -254,7 +271,6 @@ def new_record():
         return redirect(url_for("dashboard"))
     return render_template("new_record.html", maps=maps)
     
-@app.route(
 @app.route("/record/<int:record_id>")
 @login_required
 def view_record(record_id):
