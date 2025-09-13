@@ -1,5 +1,7 @@
-Flask==2.3.3
-Flask-SQLAlchemy==3.0.5
-SQLAlchemy==2.0.21
-Werkzeug==2.3.7
-gunicorn==21.2.0
+flask==3.0.3
+werkzeug==3.0.3
+itsdangerous==2.2.0
+click==8.1.7
+Jinja2==3.1.4
+pillow==10.4.0
+sqlite-utils==3.37
