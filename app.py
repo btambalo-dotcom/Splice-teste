@@ -83,7 +83,7 @@ def init_db():
         row = cur.execute(\"SELECT id FROM users WHERE username=?\", (\"admin\",)).fetchone()
         if not row:
             from werkzeug.security import generate_password_hash
-            cur.execute(\"INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)\", (\"admin\", generate_password_hash(\"admin123\")))
+            cur.execute("INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)", ("admin", generate_password_hash("admin123")))
             db.commit()
 
     # AUGMENTED: create default admin
@@ -92,7 +92,7 @@ def init_db():
         row = cur.execute("SELECT id FROM users WHERE username='admin'").fetchone()
         if not row:
             from werkzeug.security import generate_password_hash
-            cur.execute("INSERT INTO users (username, password, is_admin) VALUES (?,?,1)", ('admin', generate_password_hash('admin123')))
+            cur.execute("INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)", ("admin", generate_password_hash("admin123")))
             db.commit()
 
 
