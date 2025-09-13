@@ -1,0 +1,7 @@
+<!doctype html><title>Mapas</title>
+<h2>Mapas disponíveis</h2>
+<ul>
+{% for m in maps %}
+  <li>{{ m.filename }} — <a href="/download_map/{{ m.id }}">Baixar</a></li>
+{% endfor %}
+</ul>
