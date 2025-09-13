@@ -707,7 +707,7 @@ def export_csv():
         photos = db.execute("SELECT filename FROM photos WHERE record_id = ?", (r["id"],)).fetchall()
         host = request.host_url.rstrip("/")
         urls = [f"{host}{url_for('uploaded_file', filename=p['filename'])}" for p in photos]
-        writer.writerow([r["id"], r["device_name"], r["fusion_count"], r.get("executed_on", ""), r["created_at"], " | ".join(urls)])
+        writer.writerow([r["id"], r["device_name"], r["fusion_count"], (r["executed_on"] if "executed_on" in r.keys() else ""), r["created_at"], " | ".join(urls)])
     return Response(si.getvalue(), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": "attachment; filename=registros_splicing.csv"})
 
 # ===== Rota de emergência para resetar senha do admin =====
