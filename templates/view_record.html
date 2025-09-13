@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Detalhes
 <hr>
-<p><strong>Status:</strong> {{ record.status or 'draft' }}</p>
+<p><strong>Status:</strong> {{ record.get('status', 'draft') }}</p>
 {% if session.get('is_admin') %}
   <form method="post" action="{{ url_for('record_launch', rec_id=record.id) }}">
     <label>Selecionar Mapa de Trabalho:</label>
@@ -37,7 +37,7 @@
 <p><a class="btn secondary" href="{{ url_for('dashboard') }}">Voltar</a></p>
 
 <hr>
-<p><strong>Status:</strong> {{ record.status or 'draft' }}</p>
+<p><strong>Status:</strong> {{ record.get('status', 'draft') }}</p>
 {% if session.get('is_admin') %}
   <form method="post" action="{{ url_for('record_launch', rec_id=record.id) }}">
     <label>Selecionar Mapa de Trabalho:</label>
