@@ -176,7 +176,7 @@ try:
         _y,_m,_d = map(int, parts)
     else:
         executed_on_str = date.today().isoformat()
-except Exception:
+except Exception as e:
     executed_on_str = date.today().isoformat()
 
         if not device_name or not fusion_count:
@@ -246,7 +246,7 @@ def delete_record(record_id):
         fpath = os.path.join(app.config["UPLOAD_FOLDER"], p["filename"])
         if os.path.exists(fpath):
             try: os.remove(fpath)
-            except Exception: pass
+            except Exception as e: pass
     db.execute("DELETE FROM photos WHERE record_id = ?", (record_id,))
     db.execute("DELETE FROM records WHERE id = ?", (record_id,))
     db.commit()
