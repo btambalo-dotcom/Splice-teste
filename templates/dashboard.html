@@ -13,7 +13,6 @@
   <tr>
     <td>{{ r['device_name'] }}</td>
     <td>{{ r['fusion_count'] }}</td>
-    <td>{{ r['executed_on'] if 'executed_on' in r.keys() and r['executed_on'] else '' }}</td>
     <td>{{ r['created_at'] }}</td>
     <td>
       <a class="btn secondary" href="{{ url_for('view_record', record_id=r['id']) }}">Abrir</a>
