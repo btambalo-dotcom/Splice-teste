@@ -21,6 +21,6 @@ services:
       - key: NEW_ADMIN_PASSWORD
         value: nova123
     disk:
-      name: data
+      name: uploads-disk
       mountPath: /var/data
       sizeGB: 1

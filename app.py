@@ -12,6 +12,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.environ.get("DATA_DIR", os.path.join(BASE_DIR, "data"))
 os.makedirs(DATA_DIR, exist_ok=True)
 DB_PATH = os.path.join(DATA_DIR, "app.db")
+
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "uploads")
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 MAX_FILES_PER_RECORD = 6
@@ -20,7 +21,6 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 app = Flask(__name__)
 import traceback, sys
-
 @app.errorhandler(Exception)
 def _log_all_exceptions(e):
     app.logger.error("UNHANDLED EXCEPTION: %s", e)
@@ -36,9 +36,8 @@ def diag():
     try:
         from pprint import pformat
         info = {"DATA_DIR": DATA_DIR, "DB_PATH": DB_PATH, "UPLOAD_FOLDER": app.config.get("UPLOAD_FOLDER")}
-        from contextlib import closing
-        with closing(get_db()) as db:
-            x = db.execute("SELECT 1 AS one").fetchone()
+        with get_db() as db:
+            x = db.execute("SELECT 1 as one").fetchone()
             info["db_select_1"] = dict(x)
         return pformat(info), 200, {"Content-Type": "text/plain; charset=utf-8"}
     except Exception as e:
@@ -57,43 +56,17 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
-def init_db():
-    with closing(get_db()) as db:
-        db.executescript("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                is_admin INTEGER NOT NULL DEFAULT 0
-            );
 
-            CREATE TABLE IF NOT EXISTS records (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                device_name TEXT NOT NULL,
-                fusion_count INTEGER NOT NULL,
-                executed_on DATE DEFAULT (DATE('now')),
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(user_id) REFERENCES users(id)
-            );
-
-            CREATE TABLE IF NOT EXISTS photos (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                record_id INTEGER NOT NULL,
-                filename TEXT NOT NULL,
-                FOREIGN KEY(record_id) REFERENCES records(id)
-            );
-        """)
-        cols = db.execute("PRAGMA table_info(users)").fetchall()
-        colnames = {c[1] for c in cols}
-        if "is_admin" not in colnames:
-            db.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0;")
+\1
+    try:
         cols = db.execute("PRAGMA table_info(records)").fetchall()
         colnames = {c[1] for c in cols}
         if "executed_on" not in colnames:
-            db.execute("ALTER TABLE records ADD COLUMN executed_on DATE DEFAULT (DATE('now'));")
-
-        db.commit()
+            db.execute("ALTER TABLE records ADD COLUMN executed_on DATE")
+    except Exception as _e:
+        print("Migration check failed:", _e)
+    \2
+    
 
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -143,12 +116,7 @@ def register():
         pw_hash = generate_password_hash(password)
         try:
             db.execute("INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, ?)", (username, pw_hash, is_admin))
-            cols = db.execute("PRAGMA table_info(records)").fetchall()
-        colnames = {c[1] for c in cols}
-        if "executed_on" not in colnames:
-            db.execute("ALTER TABLE records ADD COLUMN executed_on DATE DEFAULT (DATE('now'));")
-
-        db.commit()
+            db.commit()
             flash("Usuário criado. Faça login.", "success")
             return redirect(url_for("login"))
         except sqlite3.IntegrityError:
@@ -195,16 +163,18 @@ def new_record():
         device_name = request.form.get("device_name", "").strip()
         fusion_count = request.form.get("fusion_count", "").strip()
         files = request.files.getlist("photos")
-        executed_on_str = request.form.get("executed_on", "").strip()
-        try:
-            if executed_on_str:
-                y,m,d = executed_on_str.split("-"); _=int(y); _=int(m); _=int(d)
-            else:
-                from datetime import date
-                executed_on_str = date.today().isoformat()
-        except Exception:
-            from datetime import date
-            executed_on_str = date.today().isoformat()
+executed_on_str = request.form.get("executed_on", "").strip()
+from datetime import date
+try:
+    if executed_on_str:
+        parts = executed_on_str.split("-")
+        if len(parts) != 3:
+            raise ValueError("bad date")
+        _y,_m,_d = map(int, parts)
+    else:
+        executed_on_str = date.today().isoformat()
+except Exception:
+    executed_on_str = date.today().isoformat()
 
         if not device_name or not fusion_count:
             flash("Informe nome do dispositivo e número de fusões.", "error")
@@ -238,11 +208,6 @@ def new_record():
             file.save(os.path.join(app.config["UPLOAD_FOLDER"], final_name))
             db.execute("INSERT INTO photos (record_id, filename) VALUES (?, ?)", (record_id, final_name))
             saved_any = True
-        cols = db.execute("PRAGMA table_info(records)").fetchall()
-        colnames = {c[1] for c in cols}
-        if "executed_on" not in colnames:
-            db.execute("ALTER TABLE records ADD COLUMN executed_on DATE DEFAULT (DATE('now'));")
-
         db.commit()
         if not saved_any and len(files) > 0:
             flash("Nenhuma foto foi salva (verifique os tipos permitidos).", "warning")
@@ -281,12 +246,7 @@ def delete_record(record_id):
             except Exception: pass
     db.execute("DELETE FROM photos WHERE record_id = ?", (record_id,))
     db.execute("DELETE FROM records WHERE id = ?", (record_id,))
-    cols = db.execute("PRAGMA table_info(records)").fetchall()
-        colnames = {c[1] for c in cols}
-        if "executed_on" not in colnames:
-            db.execute("ALTER TABLE records ADD COLUMN executed_on DATE DEFAULT (DATE('now'));")
-
-        db.commit()
+    db.commit()
     flash("Registro apagado.", "info")
     return redirect(url_for("dashboard"))
 
@@ -310,12 +270,7 @@ def admin_users():
         try:
             pw_hash = generate_password_hash(password)
             db.execute("INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, ?)", (username, pw_hash, is_admin))
-            cols = db.execute("PRAGMA table_info(records)").fetchall()
-        colnames = {c[1] for c in cols}
-        if "executed_on" not in colnames:
-            db.execute("ALTER TABLE records ADD COLUMN executed_on DATE DEFAULT (DATE('now'));")
-
-        db.commit()
+            db.commit()
             flash("Usuário criado com sucesso.", "success")
         except sqlite3.IntegrityError:
             flash("Nome de usuário já existe.", "error")
@@ -333,12 +288,7 @@ def admin_toggle_admin(user_id):
         return redirect(url_for("admin_users"))
     new_val = 0 if row["is_admin"] else 1
     db.execute("UPDATE users SET is_admin = ? WHERE id = ?", (new_val, user_id))
-    cols = db.execute("PRAGMA table_info(records)").fetchall()
-        colnames = {c[1] for c in cols}
-        if "executed_on" not in colnames:
-            db.execute("ALTER TABLE records ADD COLUMN executed_on DATE DEFAULT (DATE('now'));")
-
-        db.commit()
+    db.commit()
     flash("Permissão atualizada.", "success")
     return redirect(url_for("admin_users"))
 
@@ -358,11 +308,6 @@ def admin_reset_password(user_id):
             return redirect(url_for("admin_reset_password", user_id=user_id))
         pw_hash = generate_password_hash(p1)
         db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (pw_hash, user_id))
-        cols = db.execute("PRAGMA table_info(records)").fetchall()
-        colnames = {c[1] for c in cols}
-        if "executed_on" not in colnames:
-            db.execute("ALTER TABLE records ADD COLUMN executed_on DATE DEFAULT (DATE('now'));")
-
         db.commit()
         flash("Senha atualizada com sucesso.", "success")
         return redirect(url_for("admin_users"))
@@ -375,13 +320,13 @@ def admin_records():
     db = get_db()
     if user_id:
         recs = db.execute(
-            "SELECT r.id, r.device_name, r.fusion_count, r.executed_on, r.created_at, u.username "
+            "SELECT r.id, r.device_name, r.fusion_count, r.created_at, u.username "
             "FROM records r JOIN users u ON u.id = r.user_id WHERE r.user_id = ? ORDER BY r.created_at DESC",
             (user_id,),
         ).fetchall()
     else:
         recs = db.execute(
-            "SELECT r.id, r.device_name, r.fusion_count, r.executed_on, r.created_at, u.username "
+            "SELECT r.id, r.device_name, r.fusion_count, r.created_at, u.username "
             "FROM records r JOIN users u ON u.id = r.user_id ORDER BY r.created_at DESC"
         ).fetchall()
     users = db.execute("SELECT id, username FROM users ORDER BY username ASC").fetchall()
@@ -418,6 +363,8 @@ from datetime import datetime
 def admin_reports():
     start_str = request.args.get("start", "").strip()
     end_str = request.args.get("end", "").strip()
+    exec_start = request.args.get("exec_start", "").strip()
+    exec_end = request.args.get("exec_end", "").strip()
     user_id = request.args.get("user_id", type=int)
 
     clauses = []; params = []
@@ -425,6 +372,10 @@ def admin_reports():
         clauses.append("date(r.created_at) >= date(?)"); params.append(start_str)
     if end_str:
         clauses.append("date(r.created_at) <= date(?)"); params.append(end_str)
+    if exec_start:
+        clauses.append("date(r.executed_on) >= date(?)"); params.append(exec_start)
+    if exec_end:
+        clauses.append("date(r.executed_on) <= date(?)"); params.append(exec_end)
     if user_id:
         clauses.append("r.user_id = ?"); params.append(user_id)
     where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
@@ -473,6 +424,8 @@ def admin_reports():
 def admin_reports_data():
     start_str = request.args.get("start", "").strip()
     end_str = request.args.get("end", "").strip()
+    exec_start = request.args.get("exec_start", "").strip()
+    exec_end = request.args.get("exec_end", "").strip()
     user_id = request.args.get("user_id", type=int)
 
     clauses = []; params = []
@@ -480,6 +433,10 @@ def admin_reports_data():
         clauses.append("date(r.created_at) >= date(?)"); params.append(start_str)
     if end_str:
         clauses.append("date(r.created_at) <= date(?)"); params.append(end_str)
+    if exec_start:
+        clauses.append("date(r.executed_on) >= date(?)"); params.append(exec_start)
+    if exec_end:
+        clauses.append("date(r.executed_on) <= date(?)"); params.append(exec_end)
     if user_id:
         clauses.append("r.user_id = ?"); params.append(user_id)
     where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
@@ -505,6 +462,8 @@ def admin_reports_data():
 def admin_reports_csv():
     start_str = request.args.get("start", "").strip()
     end_str = request.args.get("end", "").strip()
+    exec_start = request.args.get("exec_start", "").strip()
+    exec_end = request.args.get("exec_end", "").strip()
     user_id = request.args.get("user_id", type=int)
 
     clauses = []; params = []
@@ -512,6 +471,10 @@ def admin_reports_csv():
         clauses.append("date(r.created_at) >= date(?)"); params.append(start_str)
     if end_str:
         clauses.append("date(r.created_at) <= date(?)"); params.append(end_str)
+    if exec_start:
+        clauses.append("date(r.executed_on) >= date(?)"); params.append(exec_start)
+    if exec_end:
+        clauses.append("date(r.executed_on) <= date(?)"); params.append(exec_end)
     if user_id:
         clauses.append("r.user_id = ?"); params.append(user_id)
     where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
@@ -531,6 +494,8 @@ def admin_reports_csv():
 def admin_reports_users_csv():
     start_str = request.args.get("start", "").strip()
     end_str = request.args.get("end", "").strip()
+    exec_start = request.args.get("exec_start", "").strip()
+    exec_end = request.args.get("exec_end", "").strip()
     user_id = request.args.get("user_id", type=int)
 
     clauses = []; params = []
@@ -538,6 +503,10 @@ def admin_reports_users_csv():
         clauses.append("date(r.created_at) >= date(?)"); params.append(start_str)
     if end_str:
         clauses.append("date(r.created_at) <= date(?)"); params.append(end_str)
+    if exec_start:
+        clauses.append("date(r.executed_on) >= date(?)"); params.append(exec_start)
+    if exec_end:
+        clauses.append("date(r.executed_on) <= date(?)"); params.append(exec_end)
     if user_id:
         clauses.append("r.user_id = ?"); params.append(user_id)
     where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
@@ -563,6 +532,8 @@ def admin_reports_xlsx():
 
     start_str = request.args.get("start", "").strip()
     end_str = request.args.get("end", "").strip()
+    exec_start = request.args.get("exec_start", "").strip()
+    exec_end = request.args.get("exec_end", "").strip()
     user_id = request.args.get("user_id", type=int)
 
     clauses = []; params = []
@@ -632,6 +603,8 @@ def admin_reports_xlsx():
 def admin_photos():
     start_str = request.args.get("start", "").strip()
     end_str = request.args.get("end", "").strip()
+    exec_start = request.args.get("exec_start", "").strip()
+    exec_end = request.args.get("exec_end", "").strip()
     user_id = request.args.get("user_id", type=int)
 
     clauses = []; params = []
@@ -639,6 +612,10 @@ def admin_photos():
         clauses.append("date(r.created_at) >= date(?)"); params.append(start_str)
     if end_str:
         clauses.append("date(r.created_at) <= date(?)"); params.append(end_str)
+    if exec_start:
+        clauses.append("date(r.executed_on) >= date(?)"); params.append(exec_start)
+    if exec_end:
+        clauses.append("date(r.executed_on) <= date(?)"); params.append(exec_end)
     if user_id:
         clauses.append("r.user_id = ?"); params.append(user_id)
     where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
@@ -678,6 +655,10 @@ def admin_photos_zip():
         clauses.append("date(r.created_at) >= date(?)"); params.append(start_str)
     if end_str:
         clauses.append("date(r.created_at) <= date(?)"); params.append(end_str)
+    if exec_start:
+        clauses.append("date(r.executed_on) >= date(?)"); params.append(exec_start)
+    if exec_end:
+        clauses.append("date(r.executed_on) <= date(?)"); params.append(exec_end)
     if user_id:
         clauses.append("r.user_id = ?"); params.append(user_id)
     in_clause = " OR ".join(["r.device_name = ?"] * len(selected))
@@ -727,12 +708,12 @@ def export_csv():
         (session["user_id"],),
     ).fetchall()
     si = StringIO(); writer = csv.writer(si)
-    writer.writerow(["id", "device_name", "fusion_count", "executed_on", "created_at", "photo_urls"])
+    writer.writerow(["id", "device_name", "fusion_count", "created_at", "photo_urls"])
     for r in rows:
         photos = db.execute("SELECT filename FROM photos WHERE record_id = ?", (r["id"],)).fetchall()
         host = request.host_url.rstrip("/")
         urls = [f"{host}{url_for('uploaded_file', filename=p['filename'])}" for p in photos]
-        writer.writerow([r["id"], r["device_name"], r["fusion_count"], (r["executed_on"] if "executed_on" in r.keys() else ""), r["created_at"], " | ".join(urls)])
+        writer.writerow([r["id"], r["device_name"], r["fusion_count"], r["created_at"], " | ".join(urls)])
     return Response(si.getvalue(), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": "attachment; filename=registros_splicing.csv"})
 
 # ===== Rota de emergência para resetar senha do admin =====
@@ -752,12 +733,7 @@ def force_reset_admin():
     if not row:
         return "Nenhum admin encontrado", 404
     db.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(new_pw), row["id"]))
-    cols = db.execute("PRAGMA table_info(records)").fetchall()
-        colnames = {c[1] for c in cols}
-        if "executed_on" not in colnames:
-            db.execute("ALTER TABLE records ADD COLUMN executed_on DATE DEFAULT (DATE('now'));")
-
-        db.commit()
+    db.commit()
     return f"Senha do admin (id={row['id']}) resetada para: {new_pw}"
 
 if __name__ == "__main__":
