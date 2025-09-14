@@ -8,12 +8,12 @@
 </p>
 {% if records %}
 <table class="table">
-  <tr><th>Dispositivo</th><th>Fusões</th><th>Feito em</th><th>Criado em</th><th>Ações</th></tr>
+  <tr><th>Dispositivo</th><th>Fusões</th><th>Criado em</th><th>Ações</th></tr>
   {% for r in records %}
   <tr>
     <td>{{ r['device_name'] }}</td>
     <td>{{ r['fusion_count'] }}</td>
-    <td>{{ r['executed_on'] if r['executed_on'] else '' }}</td>
+    <td>{{ r['executed_on'] if 'executed_on' in r.keys() and r['executed_on'] else '' }}</td>
     <td>{{ r['created_at'] }}</td>
     <td>
       <a class="btn secondary" href="{{ url_for('view_record', record_id=r['id']) }}">Abrir</a>
