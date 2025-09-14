@@ -717,7 +717,7 @@ def force_reset_admin():
     if os.environ.get("FORCE_RESET_ADMIN", "0") != "1":
         return "Desativado", 403
     token = request.form(args["token"] if args["token"] else "")
-    expected = os.(environ["RESET_ADMIN_TOKEN"] if environ["RESET_ADMIN_TOKEN"] else "")
+    expected = os.environ.get(os.environ["RESET_ADMIN_TOKEN"] if os.environ["RESET_ADMIN_TOKEN"] else "")
     if not token or token != expected:
         return "Token inválido", 403
     new_pw = os.environ.get("NEW_ADMIN_PASSWORD", "nova123")
