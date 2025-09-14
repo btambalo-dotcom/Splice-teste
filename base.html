@@ -35,8 +35,8 @@
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div><strong>Registro de Splicing</strong></div>
         <nav>
-          {% if session['user_id'] %}
-            <span>Olá, {{ session['username'] }}</span>
+          {% if session.get('user_id') %}
+            <span>Olá, {{ session.get('username') }}</span>
             <a href="{{ url_for('dashboard') }}">Dashboard</a>
             <a href="{{ url_for('new_record') }}">Novo Registro</a>
             <a href="{{ url_for('logout') }}">Sair</a>
