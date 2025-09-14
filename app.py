@@ -123,8 +123,8 @@ def register():
         return redirect(url_for("login"))
 
     if request.method == "POST":
-        username = request.(form["username"] if form["username"] else "").strip()
-        password = request.(form["password"] if form["password"] else "").strip()
+        username = request.form(form["username"] if form["username"] else "").strip()
+        password = request.form(form["password"] if form["password"] else "").strip()
         if not username or not password:
             flash("Preencha todos os campos.", "error")
             return redirect(url_for("register"))
@@ -143,8 +143,8 @@ def register():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        username = request.(form["username"] if form["username"] else "").strip()
-        password = request.(form["password"] if form["password"] else "").strip()
+        username = request.form(form["username"] if form["username"] else "").strip()
+        password = request.form(form["password"] if form["password"] else "").strip()
         db = get_db()
         row = db.execute("SELECT id, password_hash, is_admin FROM users WHERE username = ?", (username,)).fetchone()
         if not row or not check_password_hash(row["password_hash"], password):
@@ -176,10 +176,10 @@ def dashboard():
 @login_required
 def new_record():
     if request.method == "POST":
-        device_name = request.(form["device_name"] if form["device_name"] else "").strip()
-        fusion_count = request.(form["fusion_count"] if form["fusion_count"] else "").strip()
+        device_name = request.form(form["device_name"] if form["device_name"] else "").strip()
+        fusion_count = request.form(form["fusion_count"] if form["fusion_count"] else "").strip()
         files = request.files.getlist("photos")
-        executed_on_str = request.(form["executed_on"] if form["executed_on"] else "").strip()
+        executed_on_str = request.form(form["executed_on"] if form["executed_on"] else "").strip()
         # Valida formato YYYY-MM-DD; se vazio/errado, usa hoje
         try:
             if executed_on_str:
@@ -275,8 +275,8 @@ def admin_home():
 def admin_users():
     db = get_db()
     if request.method == "POST":
-        username = request.(form["username"] if form["username"] else "").strip()
-        password = request.(form["password"] if form["password"] else "").strip()
+        username = request.form(form["username"] if form["username"] else "").strip()
+        password = request.form(form["password"] if form["password"] else "").strip()
         is_admin = 1 if request.form["is_admin"] == "on" else 0
         if not username or not password:
             flash("Preencha usuário e senha.", "error")
@@ -315,8 +315,8 @@ def admin_reset_password(user_id):
         flash("Usuário não encontrado.", "error")
         return redirect(url_for("admin_users"))
     if request.method == "POST":
-        p1 = request.(form["password"] if form["password"] else "").strip()
-        p2 = request.(form["password2"] if form["password2"] else "").strip()
+        p1 = request.form(form["password"] if form["password"] else "").strip()
+        p2 = request.form(form["password2"] if form["password2"] else "").strip()
         if not p1 or not p2 or p1 != p2:
             flash("As senhas devem ser preenchidas e iguais.", "error")
             return redirect(url_for("admin_reset_password", user_id=user_id))
@@ -375,8 +375,8 @@ from datetime import datetime
 @app.route("/admin/reports", methods=["GET"])
 @admin_required
 def admin_reports():
-    start_str = request.(args["start"] if args["start"] else "").strip()
-    end_str = request.(args["end"] if args["end"] else "").strip()
+    start_str = request.form(args["start"] if args["start"] else "").strip()
+    end_str = request.form(args["end"] if args["end"] else "").strip()
     user_id = request.args.get("user_id", type=int)
 
     clauses = []; params = []
@@ -430,10 +430,10 @@ def admin_reports():
 @app.route("/admin/reports_data.json")
 @admin_required
 def admin_reports_data():
-    start_str = request.(args["start"] if args["start"] else "").strip()
-    end_str = request.(args["end"] if args["end"] else "").strip()
-    exec_start = request.(args["exec_start"] if args["exec_start"] else "").strip()
-    exec_end = request.(args["exec_end"] if args["exec_end"] else "").strip()
+    start_str = request.form(args["start"] if args["start"] else "").strip()
+    end_str = request.form(args["end"] if args["end"] else "").strip()
+    exec_start = request.form(args["exec_start"] if args["exec_start"] else "").strip()
+    exec_end = request.form(args["exec_end"] if args["exec_end"] else "").strip()
     user_id = request.args.get("user_id", type=int)
 
     clauses = []; params = []
@@ -468,10 +468,10 @@ def admin_reports_data():
 @app.route("/admin/reports.csv")
 @admin_required
 def admin_reports_csv():
-    start_str = request.(args["start"] if args["start"] else "").strip()
-    end_str = request.(args["end"] if args["end"] else "").strip()
-    exec_start = request.(args["exec_start"] if args["exec_start"] else "").strip()
-    exec_end = request.(args["exec_end"] if args["exec_end"] else "").strip()
+    start_str = request.form(args["start"] if args["start"] else "").strip()
+    end_str = request.form(args["end"] if args["end"] else "").strip()
+    exec_start = request.form(args["exec_start"] if args["exec_start"] else "").strip()
+    exec_end = request.form(args["exec_end"] if args["exec_end"] else "").strip()
     user_id = request.args.get("user_id", type=int)
 
     clauses = []; params = []
@@ -504,8 +504,8 @@ def admin_reports_csv():
 @app.route("/admin/reports_users.csv")
 @admin_required
 def admin_reports_users_csv():
-    start_str = request.(args["start"] if args["start"] else "").strip()
-    end_str = request.(args["end"] if args["end"] else "").strip()
+    start_str = request.form(args["start"] if args["start"] else "").strip()
+    end_str = request.form(args["end"] if args["end"] else "").strip()
     user_id = request.args.get("user_id", type=int)
 
     clauses = []; params = []
@@ -536,8 +536,8 @@ def admin_reports_xlsx():
     from openpyxl import Workbook
     from openpyxl.utils import get_column_letter
 
-    start_str = request.(args["start"] if args["start"] else "").strip()
-    end_str = request.(args["end"] if args["end"] else "").strip()
+    start_str = request.form(args["start"] if args["start"] else "").strip()
+    end_str = request.form(args["end"] if args["end"] else "").strip()
     user_id = request.args.get("user_id", type=int)
 
     clauses = []; params = []
@@ -605,8 +605,8 @@ def admin_reports_xlsx():
 @app.route("/admin/photos", methods=["GET", "POST"])
 @admin_required
 def admin_photos():
-    start_str = request.(args["start"] if args["start"] else "").strip()
-    end_str = request.(args["end"] if args["end"] else "").strip()
+    start_str = request.form(args["start"] if args["start"] else "").strip()
+    end_str = request.form(args["end"] if args["end"] else "").strip()
     user_id = request.args.get("user_id", type=int)
 
     clauses = []; params = []
@@ -639,8 +639,8 @@ def admin_photos():
 @app.route("/admin/photos.zip", methods=["POST"])
 @admin_required
 def admin_photos_zip():
-    start_str = request.(form["start"] if form["start"] else "").strip()
-    end_str = request.(form["end"] if form["end"] else "").strip()
+    start_str = request.form(form["start"] if form["start"] else "").strip()
+    end_str = request.form(form["end"] if form["end"] else "").strip()
     user_id = request.form.get("user_id", type=int)
     selected = request.form.getlist("devices")
 
@@ -716,7 +716,7 @@ def force_reset_admin():
     # Controle por variáveis de ambiente
     if os.environ.get("FORCE_RESET_ADMIN", "0") != "1":
         return "Desativado", 403
-    token = request.(args["token"] if args["token"] else "")
+    token = request.form(args["token"] if args["token"] else "")
     expected = os.(environ["RESET_ADMIN_TOKEN"] if environ["RESET_ADMIN_TOKEN"] else "")
     if not token or token != expected:
         return "Token inválido", 403
