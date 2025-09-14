@@ -5,10 +5,8 @@ services:
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
-        startCommand: gunicorn app:app -w 1 -k sync -b 0.0.0.0:10000 --log-level info --access-logfile - --error-logfile -
+    startCommand: gunicorn app:app
     envVars:
-      - key: DATA_DIR
-        value: /var/data
       - key: SECRET_KEY
         value: e6587411a188fb4641c417be4440ed00
       - key: MAX_CONTENT_LENGTH_MB
@@ -22,5 +20,5 @@ services:
         value: nova123
     disk:
       name: uploads-disk
-      mountPath: /var/data
+      mountPath: /opt/render/project/src/static/uploads
       sizeGB: 1
