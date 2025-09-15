@@ -1,26 +1,31 @@
+# -*- coding: utf-8 -*-
 import os
-from pathlib import Path
+import sqlite3
 
-DEFAULT_DATA_DIR = "/var/data"
-DEFAULT_DB_FILE = "splice.db"
-
-def get_settings():
-    data_dir = os.getenv("DATA_DIR", DEFAULT_DATA_DIR)
-    db_file = os.getenv("DATABASE_FILE", DEFAULT_DB_FILE)
-    return data_dir, db_file
-
-def ensure_dirs(data_dir: str):
-    Path(data_dir).mkdir(parents=True, exist_ok=True)
-    # optional persistent subfolders
-    for d in ("workmaps", "backups", "uploads"):
-        Path(data_dir, d).mkdir(parents=True, exist_ok=True)
-
-def ensure_persist() -> str:
-    """Ensure a persistent sqlite path on a Render Disk.
-    Returns the absolute path to the DB file (string).
+def ensure_persist():
     """
-    data_dir, db_file = get_settings()
-    ensure_dirs(data_dir)
-    db_path = os.path.join(data_dir, db_file)
-    # Let sqlite create the file on first connect/commit
-    return db_path
+    Garante persistência do banco em /var/data (ou DATA_DIR),
+    cria pasta/arquivo se necessário e retorna exatamente 4 valores:
+    (DATA_DIR, DATABASE_FILE, DB_PATH, DATABASE_URL)
+    """
+    DATA_DIR = os.getenv("DATA_DIR", "/var/data").rstrip("/")
+    os.makedirs(DATA_DIR, exist_ok=True)
+
+    DATABASE_FILE = os.getenv("DATABASE_FILE", "splice.db")
+    DB_PATH = os.path.join(DATA_DIR, DATABASE_FILE)
+
+    # Se o arquivo não existir, cria um SQLite válido e uma tabela dummy
+    if not os.path.exists(DB_PATH):
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            # tabela simples para garantir arquivo válido
+            conn.execute("CREATE TABLE IF NOT EXISTS __init__(id INTEGER PRIMARY KEY)")
+            conn.commit()
+            conn.close()
+        except Exception:
+            # Se der erro, ainda assim seguimos — o arquivo será criado depois pelo app
+            pass
+
+    DATABASE_URL = f"sqlite:///{DB_PATH}"
+    # Retorna **exatamente 4 valores**, na ordem esperada
+    return DATA_DIR, DATABASE_FILE, DB_PATH, DATABASE_URL
