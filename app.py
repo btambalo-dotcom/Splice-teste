@@ -1,23 +1,11 @@
 
-# --- Render Disk persistent DB configuration ---
-DATA_DIR = os.getenv("DATA_DIR", "/var/data")
-os.makedirs(DATA_DIR, exist_ok=True)
-DB_PATH = os.path.join(DATA_DIR, "splice_db.sqlite")
-SQLALCHEMY_DATABASE_URI = f"sqlite:///{DB_PATH}"
-try:
-    app.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
-except Exception:
-    # Some apps use different config objects; set a module-level constant as fallback
-    pass
-# ------------------------------------------------
-
 # --- Persistence setup for Render Disk ---
 import os as _os
 PERSIST_DIR = _os.environ.get("PERSIST_DIR", "/var/data")
 _os.makedirs(PERSIST_DIR, exist_ok=True)
 DB_FILE = _os.path.join(PERSIST_DIR, "app.db")
 
-from flask import (
+from flask import jsonify, (
     Flask, render_template, request, redirect, url_for,
     flash, session, send_from_directory, abort, Response
 )
@@ -184,7 +172,7 @@ def backup_db():
         ts = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S")
         dest = os.path.join(BACKUP_DIR, f"app-{ts}.db")
         src = sqlite3.connect(DB_PATH)
-        dst = sqlite3.connect(dest)
+        dst = sqlite3.connect(DB_PATH)
         with dst:
             src.backup(dst)
         src.close()
@@ -1127,3 +1115,23 @@ def _fmt_dt(ts):
         return _dt.datetime.utcfromtimestamp(int(ts)).strftime('%Y-%m-%d %H:%M UTC')
     except Exception:
         return str(ts)
+
+
+@app.route("/favicon.ico")
+def favicon():
+    return ("", 204)
+
+
+@app.route("/_persist")
+def _persist():
+    try:
+        info = {}
+        info["DATA_DIR"] = DATA_DIR
+        info["DB_PATH"] = DB_PATH
+        info["db_exists"] = os.path.exists(DB_PATH)
+        if info["db_exists"]:
+            st = os.stat(DB_PATH)
+            info["db_size_bytes"] = st.st_size
+        return jsonify(info), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
