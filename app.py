@@ -1,4 +1,26 @@
 
+# === Persistência em /var/data (injeção automática) ===
+try:
+    import os, pathlib
+    DATA_DIR = os.getenv("DATA_DIR", "/var/data")
+    DB_FILE = os.getenv("DATABASE_FILE", "splice.db")
+    DB_PATH = os.path.join(DATA_DIR, DB_FILE)
+    os.makedirs(DATA_DIR, exist_ok=True)
+
+    # Popular múltiplas convenções de variáveis de ambiente para frameworks comuns
+    db_url = f"sqlite:///{DB_PATH}"
+    os.environ.setdefault("DATABASE_URL", db_url)                # Flask SQLAlchemy / genérico
+    os.environ.setdefault("SQLALCHEMY_DATABASE_URI", db_url)     # Flask-SQLAlchemy
+    os.environ.setdefault("DB_PATH", DB_PATH)                    # Apps que usam caminho direto
+    os.environ.setdefault("DB_FILE", DB_FILE)
+    os.environ.setdefault("DATA_DIR", DATA_DIR)
+
+    # Flag para healthz
+    os.environ["SPLICE_PERSIST_READY"] = "1"
+except Exception as _e:  # Não quebrar o boot em caso de ambiente restrito
+    _persist_inject_error = str(_e)
+# === Fim da injeção ===
+
 
 from persist_helper import ensure_persist
 DATA_DIR, DATABASE_FILE, DB_PATH, DATABASE_URL = ensure_persist()
@@ -1148,3 +1170,23 @@ def _debug_db():
         "dir_listing": listing,
         "DATABASE_URL": os.getenv("DATABASE_URL")
     })
+
+# === Rota auxiliar /db.json para debug de persistência ===
+try:
+    from flask import Blueprint, jsonify
+    from persist_helper import persist_info
+    _persist_bp = Blueprint("persist_debug", __name__)
+
+    @_persist_bp.route("/db.json")
+    def _persist_db_json():
+        return jsonify(persist_info())
+
+    # Auto registrar no app se existir variável 'app'
+    if "app" in globals():
+        try:
+            app.register_blueprint(_persist_bp)
+        except Exception:
+            pass
+except Exception:
+    pass
+# === Fim rota auxiliar ===
