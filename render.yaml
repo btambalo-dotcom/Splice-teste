@@ -7,6 +7,8 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
     envVars:
+      - key: DATA_DIR
+        value: /var/data
       - key: SECRET_KEY
         value: e6587411a188fb4641c417be4440ed00
       - key: MAX_CONTENT_LENGTH_MB
