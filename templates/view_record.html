@@ -3,7 +3,7 @@
 {% block title %}Detalhes do Registro{% endblock %}
 
 {% block content %}
-  <p><strong>Status:</strong> {{ rec.get('status', 'draft') }}</p>
+  <p><strong>Status:</strong> {{ rec.status }}</p>
 
   {% if session.get('is_admin') %}
   <form method="post" action="{{ url_for('record_launch', rec_id=rec.id) }}">
