@@ -20,12 +20,6 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(WORKMAP_FOLDER, exist_ok=True)
 
 app = Flask(__name__)
-# --- Added to avoid 500/404 noise for browsers' favicon requests ---
-@app.route('/favicon.ico')
-def favicon():
-    # Return 204 No Content to suppress error pages/log noise.
-    return ("", 204)
-
 UPLOAD_FOLDER = UPLOAD_FOLDER
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 max_len_mb = int(os.environ.get("MAX_CONTENT_LENGTH_MB", "20"))
@@ -1114,14 +1108,3 @@ def _fmt_dt(ts):
         return _dt.datetime.utcfromtimestamp(int(ts)).strftime('%Y-%m-%d %H:%M UTC')
     except Exception:
         return str(ts)
-
-
-# --- Generic error handler so unexpected exceptions don't show Werkzeug HTML ---
-@app.errorhandler(Exception)
-def handle_unexpected_error(e):
-    try:
-        app.logger.exception("Unhandled error: %s", e)
-    except Exception:
-        pass
-    # keep it minimal and Portuguese as you saw before
-    return ("Erro interno (já registrado nos logs).", 500)
