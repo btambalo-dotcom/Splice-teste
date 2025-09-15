@@ -1,17 +1,24 @@
+
 services:
   - type: web
-    name: splice-teste
+    name: splice-admin-app
     env: python
-    region: oregon
-    plan: starter
+    plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app -w 1 -k sync -b 0.0.0.0:$PORT --timeout 120 --graceful-timeout 30 --log-level info --access-logfile - --error-logfile -
+    startCommand: gunicorn app:app
     envVars:
-      - key: DATA_DIR
-        value: /var/data
-    healthCheckPath: /healthz
-    autoDeploy: false
+      - key: SECRET_KEY
+        value: e6587411a188fb4641c417be4440ed00
+      - key: MAX_CONTENT_LENGTH_MB
+        value: "20"
+      # Para reset de emergência, habilite e defina token/senha:
+      - key: FORCE_RESET_ADMIN
+        value: "0"
+      - key: RESET_ADMIN_TOKEN
+        value: 6b4eae01010216c7
+      - key: NEW_ADMIN_PASSWORD
+        value: nova123
     disk:
-      name: data
-      mountPath: /var/data
+      name: uploads-disk
+      mountPath: /opt/render/project/src/static/uploads
       sizeGB: 1
