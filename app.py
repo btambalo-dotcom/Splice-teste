@@ -1,15 +1,5 @@
 
-
-# --- Persistência no DISK do Render ---
-import os
-DATA_DIR = os.getenv("DATA_DIR", "/var/data")
-try:
-    os.makedirs(DATA_DIR, exist_ok=True)
-except Exception:
-    pass
-DB_PATH = os.path.join(DATA_DIR, os.getenv("DATABASE_FILE", "splice.db"))
-DATABASE_URL = f"DATABASE_URL"
-# --------------------------------------
+from db_helper import resolve_db_url, resolve_db_path
 # --- Persistence setup for Render Disk ---
 import os as _os
 PERSIST_DIR = _os.environ.get("PERSIST_DIR", "/var/data")
