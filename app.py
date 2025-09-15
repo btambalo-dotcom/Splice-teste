@@ -1,5 +1,14 @@
 
-from db_helper import resolve_db_url, resolve_db_path
+
+# === FORCE PERSISTENCE ON RENDER DISK ===
+import os, pathlib
+DATA_DIR = os.getenv("DATA_DIR", "/var/data")
+pathlib.Path(DATA_DIR).mkdir(parents=True, exist_ok=True)
+DB_FILE = os.getenv("DATABASE_FILE", "splice.db")
+DB_PATH = os.path.join(DATA_DIR, DB_FILE)
+# Hard-override DATABASE_URL to avoid wrong envs
+os.environ["DATABASE_URL"] = f"sqlite:///{DB_PATH}"
+# ========================================
 # --- Persistence setup for Render Disk ---
 import os as _os
 PERSIST_DIR = _os.environ.get("PERSIST_DIR", "/var/data")
@@ -1116,3 +1125,24 @@ def _fmt_dt(ts):
         return _dt.datetime.utcfromtimestamp(int(ts)).strftime('%Y-%m-%d %H:%M UTC')
     except Exception:
         return str(ts)
+
+
+@app.get("/_debug/db")
+def _debug_db():
+    from flask import jsonify
+    import os
+    data_dir = os.getenv("DATA_DIR", "/var/data")
+    db_file = os.getenv("DATABASE_FILE", "splice.db")
+    db_path = os.path.join(data_dir, db_file)
+    try:
+        listing = os.listdir(data_dir)
+    except Exception as e:
+        listing = [f"<error: {e}>"]
+    return jsonify({
+        "DATA_DIR": data_dir,
+        "DATABASE_FILE": db_file,
+        "db_path": db_path,
+        "db_exists": os.path.exists(db_path),
+        "dir_listing": listing,
+        "DATABASE_URL": os.getenv("DATABASE_URL")
+    })
