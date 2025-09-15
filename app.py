@@ -1,27 +1,4 @@
-
-# ==== Render Disk persistence (forced) ====
-import os as _os, sqlite3 as _sqlite3, sys as _sys, traceback as _traceback
-DATA_DIR = _os.environ.get("DATA_DIR", "/var/data")
-_os.makedirs(DATA_DIR, exist_ok=True)
-DB_PATH = _os.path.join(DATA_DIR, "app.db")
-
-# Move legacy DB if found (first boot after fix)
-try:
-    legacy_db = _os.path.join(_os.path.dirname(__file__), "app.db")
-    if _os.path.exists(legacy_db) and not _os.path.exists(DB_PATH):
-        _os.replace(legacy_db, DB_PATH)
-except Exception as _e:
-    print("DB migrate/move error:", _e, file=_sys.stderr)
-# ==========================================
-
-
-# --- Persistence setup for Render Disk ---
-import os as _os
-PERSIST_DIR = _os.environ.get("PERSIST_DIR", "/var/data")
-_os.makedirs(PERSIST_DIR, exist_ok=True)
-DB_FILE = _os.path.join(PERSIST_DIR, "app.db")
-
-from flask import jsonify, (
+from flask import (
     Flask, render_template, request, redirect, url_for,
     flash, session, send_from_directory, abort, Response
 )
@@ -32,7 +9,7 @@ from contextlib import closing
 from io import StringIO, BytesIO
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.environ.get("DATA_DIR", "/data")  # Persistente no Render Disk
+DATA_DIR = os.environ.get("DATA_DIR", "/var/data")  # Persistente no Render Disk
 DB_PATH = os.environ.get("DB_PATH", os.path.join(DATA_DIR, "app.db"))
 UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", os.path.join(DATA_DIR, "uploads"))
 WORKMAP_FOLDER = os.environ.get("WORKMAP_FOLDER", os.path.join(DATA_DIR, "workmaps"))
@@ -51,7 +28,7 @@ app.config["MAX_CONTENT_LENGTH"] = max_len_mb * 1024 * 1024
 DB_PATH = os.path.join(BASE_DIR, "app.db")
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -187,8 +164,8 @@ def backup_db():
         import datetime
         ts = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S")
         dest = os.path.join(BACKUP_DIR, f"app-{ts}.db")
-        src = sqlite3.connect(DB_PATH, timeout=30)
-        dst = sqlite3.connect(DB_PATH, timeout=30)
+        src = sqlite3.connect(DB_PATH)
+        dst = sqlite3.connect(dest)
         with dst:
             src.backup(dst)
         src.close()
@@ -1131,21 +1108,3 @@ def _fmt_dt(ts):
         return _dt.datetime.utcfromtimestamp(int(ts)).strftime('%Y-%m-%d %H:%M UTC')
     except Exception:
         return str(ts)
-
-
-@app.route("/_persist")
-def _persist():
-    try:
-        info = {}
-        info["DATA_DIR"] = DATA_DIR
-        info["DB_PATH"] = DB_PATH
-        info["db_exists"] = _os.path.exists(DB_PATH)
-        if info["db_exists"]:
-            st = _os.stat(DB_PATH)
-            info["db_size_bytes"] = st.st_size
-            info["db_mtime"] = st.st_mtime
-        info["data_dir_listing"] = sorted(_os.listdir(DATA_DIR)) if _os.path.isdir(DATA_DIR) else []
-        return (jsonify(info), 200)
-    except Exception as e:
-        _traceback.print_exc(file=_sys.stderr)
-        return ({"error": str(e)}, 500)
