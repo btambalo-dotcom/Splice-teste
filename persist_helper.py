@@ -1,14 +1,26 @@
+import os
+from pathlib import Path
 
-import os, json
+DEFAULT_DATA_DIR = "/var/data"
+DEFAULT_DB_FILE = "splice.db"
 
-def persist_info():
-    data_dir = os.getenv("DATA_DIR", "/var/data")
-    db_file = os.getenv("DATABASE_FILE", "splice.db")
+def get_settings():
+    data_dir = os.getenv("DATA_DIR", DEFAULT_DATA_DIR)
+    db_file = os.getenv("DATABASE_FILE", DEFAULT_DB_FILE)
+    return data_dir, db_file
+
+def ensure_dirs(data_dir: str):
+    Path(data_dir).mkdir(parents=True, exist_ok=True)
+    # optional persistent subfolders
+    for d in ("workmaps", "backups", "uploads"):
+        Path(data_dir, d).mkdir(parents=True, exist_ok=True)
+
+def ensure_persist() -> str:
+    """Ensure a persistent sqlite path on a Render Disk.
+    Returns the absolute path to the DB file (string).
+    """
+    data_dir, db_file = get_settings()
+    ensure_dirs(data_dir)
     db_path = os.path.join(data_dir, db_file)
-    return {
-        "DATA_DIR": data_dir,
-        "DATABASE_FILE": db_file,
-        "db_path": db_path,
-        "DATABASE_URL": os.getenv("DATABASE_URL"),
-        "dir_listing": sorted([p for p in os.listdir(data_dir)]) if os.path.isdir(data_dir) else []
-    }
+    # Let sqlite create the file on first connect/commit
+    return db_path
