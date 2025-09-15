@@ -50,3 +50,5 @@ with closing(get_db()) as db:
                   ("admin", generate_password_hash("admin123")))
     db.commit()
 print("OK: schema criado e admin garantido em", DB_PATH)
+
+# Patched to be idempotent and to avoid dropping data on redeploys.

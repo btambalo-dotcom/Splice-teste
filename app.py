@@ -1,3 +1,22 @@
+
+# --- Render Disk persistent DB configuration ---
+DATA_DIR = os.getenv("DATA_DIR", "/var/data")
+os.makedirs(DATA_DIR, exist_ok=True)
+DB_PATH = os.path.join(DATA_DIR, "splice_db.sqlite")
+SQLALCHEMY_DATABASE_URI = f"sqlite:///{DB_PATH}"
+try:
+    app.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
+except Exception:
+    # Some apps use different config objects; set a module-level constant as fallback
+    pass
+# ------------------------------------------------
+
+# --- Persistence setup for Render Disk ---
+import os as _os
+PERSIST_DIR = _os.environ.get("PERSIST_DIR", "/var/data")
+_os.makedirs(PERSIST_DIR, exist_ok=True)
+DB_FILE = _os.path.join(PERSIST_DIR, "app.db")
+
 from flask import (
     Flask, render_template, request, redirect, url_for,
     flash, session, send_from_directory, abort, Response
@@ -9,7 +28,7 @@ from contextlib import closing
 from io import StringIO, BytesIO
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.environ.get("DATA_DIR", "/var/data")  # Persistente no Render Disk
+DATA_DIR = os.environ.get("DATA_DIR", "/data")  # Persistente no Render Disk
 DB_PATH = os.environ.get("DB_PATH", os.path.join(DATA_DIR, "app.db"))
 UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", os.path.join(DATA_DIR, "uploads"))
 WORKMAP_FOLDER = os.environ.get("WORKMAP_FOLDER", os.path.join(DATA_DIR, "workmaps"))
