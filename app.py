@@ -1,5 +1,7 @@
 
 
+from persist_helper import ensure_persist
+DATA_DIR, DATABASE_FILE, DB_PATH, DATABASE_URL = ensure_persist()
 # === FORCE PERSISTENCE ON RENDER DISK ===
 import os, pathlib
 DATA_DIR = os.getenv("DATA_DIR", "/var/data")
