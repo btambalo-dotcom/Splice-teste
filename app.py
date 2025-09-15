@@ -1,3 +1,10 @@
+
+# --- Persistence setup for Render Disk ---
+import os as _os
+PERSIST_DIR = _os.environ.get("PERSIST_DIR", "/var/data")
+_os.makedirs(PERSIST_DIR, exist_ok=True)
+DB_FILE = _os.path.join(PERSIST_DIR, "app.db")
+
 from flask import (
     Flask, render_template, request, redirect, url_for,
     flash, session, send_from_directory, abort, Response
