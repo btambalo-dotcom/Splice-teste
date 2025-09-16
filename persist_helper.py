@@ -1,31 +1,31 @@
 # -*- coding: utf-8 -*-
-import os
-import sqlite3
+# Ferramentas de persistência para Render.
+# - Garante /var/data
+# - Define variáveis de ambiente padrão para SQLite
+# - Cria o arquivo do banco se não existir
+import os, pathlib
 
-def ensure_persist():
-    """
-    Garante persistência do banco em /var/data (ou DATA_DIR),
-    cria pasta/arquivo se necessário e retorna exatamente 4 valores:
-    (DATA_DIR, DATABASE_FILE, DB_PATH, DATABASE_URL)
-    """
-    DATA_DIR = os.getenv("DATA_DIR", "/var/data").rstrip("/")
-    os.makedirs(DATA_DIR, exist_ok=True)
-
-    DATABASE_FILE = os.getenv("DATABASE_FILE", "splice.db")
-    DB_PATH = os.path.join(DATA_DIR, DATABASE_FILE)
-
-    # Se o arquivo não existir, cria um SQLite válido e uma tabela dummy
-    if not os.path.exists(DB_PATH):
-        try:
-            conn = sqlite3.connect(DB_PATH)
-            # tabela simples para garantir arquivo válido
-            conn.execute("CREATE TABLE IF NOT EXISTS __init__(id INTEGER PRIMARY KEY)")
-            conn.commit()
-            conn.close()
-        except Exception:
-            # Se der erro, ainda assim seguimos — o arquivo será criado depois pelo app
-            pass
-
-    DATABASE_URL = f"sqlite:///{DB_PATH}"
-    # Retorna **exatamente 4 valores**, na ordem esperada
-    return DATA_DIR, DATABASE_FILE, DB_PATH, DATABASE_URL
+def ensure_persist(default_dir='/var/data', default_db='splice.db'):
+    try:
+        data_dir = os.getenv('DATA_DIR', default_dir)
+        db_file = os.getenv('DATABASE_FILE', os.getenv('DB_FILE', default_db))
+        os.makedirs(data_dir, exist_ok=True)
+        db_path = os.path.join(data_dir, db_file)
+        # URLs SQLite comuns
+        if db_path.startswith('/'):
+            sqlite_url = 'sqlite:///' + db_path
+        else:
+            sqlite_url = 'sqlite:///' + os.path.abspath(db_path)
+        # Popular variáveis comuns usadas por apps Flask
+        os.environ.setdefault('DATA_DIR', data_dir)
+        os.environ.setdefault('DB_FILE', db_file)
+        os.environ.setdefault('DB_PATH', db_path)
+        os.environ.setdefault('DATABASE_URL', sqlite_url)
+        os.environ.setdefault('SQLALCHEMY_DATABASE_URI', sqlite_url)
+        # Cria arquivo do DB se não existir (touch)
+        if not os.path.exists(db_path):
+            pathlib.Path(db_path).touch()
+        return data_dir, db_file, db_path, sqlite_url
+    except Exception as e:
+        os.environ['SPLICE_PERSIST_ERROR'] = str(e)
+        return None, None, None, None

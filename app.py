@@ -1191,3 +1191,10 @@ try:
 except Exception:
     pass
 # === Fim rota auxiliar ===
+
+# --- Endpoints de saúde e debug ---
+try:
+    from monitor_bp import monitor_bp
+    app.register_blueprint(monitor_bp)
+except Exception as _bp_e:
+    pass
