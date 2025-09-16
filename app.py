@@ -25,6 +25,35 @@ except Exception as _e:  # Não quebrar o boot em caso de ambiente restrito
 from persist_helper import ensure_persist
 DATA_DIR, DATABASE_FILE, DB_PATH, DATABASE_URL = ensure_persist()
 
+# Ensure DATABASE_URL is set for ORMs to the persistent file
+import os as _os
+_os.environ["DATABASE_URL"] = f"sqlite:///{DB_PATH}"
+
+
+# ---- SQLITE FORCE-PERSIST PATCH ----
+try:
+    import sqlite3 as _sqlite3
+    _orig_connect = _sqlite3.connect
+    def _force_persist_connect(path, *args, **kwargs):
+        try:
+            # If a relative or non-/var/data .db path is used anywhere, redirect to DB_PATH
+            if isinstance(path, str):
+                # in-memory guard
+                if path.strip().lower() in (":memory:", "file::memory:?cache=shared"):
+                    path = DB_PATH
+                # .db filename without absolute /var/data prefix -> force DB_PATH
+                elif path.endswith(".db") and not path.startswith("/var/data"):
+                    path = DB_PATH
+            kwargs.setdefault("check_same_thread", False)
+        except Exception:
+            pass
+        return _orig_connect(path, *args, **kwargs)
+    _sqlite3.connect = _force_persist_connect
+except Exception:
+    pass
+# ---- END SQLITE FORCE-PERSIST PATCH ----
+
+
 # Garantir que frameworks que leem DATABASE_URL usem o caminho persistente
 import os as _os
 _os.environ.setdefault("DATABASE_URL", DATABASE_URL)
