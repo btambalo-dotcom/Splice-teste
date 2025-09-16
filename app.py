@@ -24,6 +24,11 @@ except Exception as _e:  # Não quebrar o boot em caso de ambiente restrito
 
 from persist_helper import ensure_persist
 DATA_DIR, DATABASE_FILE, DB_PATH, DATABASE_URL = ensure_persist()
+
+# Garantir que frameworks que leem DATABASE_URL usem o caminho persistente
+import os as _os
+_os.environ.setdefault("DATABASE_URL", DATABASE_URL)
+
 # === FORCE PERSISTENCE ON RENDER DISK ===
 import os, pathlib
 DATA_DIR = os.getenv("DATA_DIR", "/var/data")
