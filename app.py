@@ -1,6 +1,7 @@
 import os
 
 # === Persistência em /var/data (injeção automática) ===
+from persist_guard import DB_PATH  # ativa backup e bloqueio de DROP/TRUNCATE
 try:
     import os, pathlib
     DATA_DIR = os.getenv("DATA_DIR", "/var/data")
