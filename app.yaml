@@ -1,0 +1,24 @@
+name: splice-app
+region: nyc
+services:
+  - name: web
+    environment_slug: python
+    instance_size_slug: basic-xxs
+    http_port: 8080
+    run_command: gunicorn app:app --bind 0.0.0.0:$PORT
+    envs:
+      - key: DATA_DIR
+        value: /workspace/data
+      - key: DATABASE_FILE
+        value: splice.db
+      - key: SECRET_KEY
+        value: troque-por-uma-senha-secreta
+        type: SECRET
+    routes:
+      - path: /
+    health_check:
+      path: /
+      initial_delay_seconds: 10
+      period_seconds: 10
+      timeout_seconds: 5
+      failure_threshold: 6
