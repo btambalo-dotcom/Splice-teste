@@ -3,7 +3,7 @@ import os, re, shutil, datetime
 from pathlib import Path
 import sqlite3
 
-DATA_DIR = os.getenv("DATA_DIR", "/var/data")
+DATA_DIR = os.getenv("DATA_DIR", "/workspace/data")
 DB_FILE  = os.getenv("DATABASE_FILE", "splice.db")
 DB_PATH  = str(Path(DATA_DIR) / DB_FILE)
 
@@ -22,19 +22,31 @@ except Exception:
 # Guard against destructive SQL
 _DANGEROUS = re.compile(r"\b(DROP\s+TABLE|DROP\s+SCHEMA|TRUNCATE|DELETE\s+FROM\s+\w+\s*;?)", re.I)
 _ALLOW_DROP = os.getenv("ALLOW_DESTRUCTIVE_SQL", "0") == "1"
+_orig_connect = sqlite3.connect
 
-class GuardedConnection(sqlite3.Connection):
-    def execute(self, sql, *args, **kwargs):
-        if not _ALLOW_DROP and isinstance(sql, str) and _DANGEROUS.search(sql):
+def _connect_guard(*args, **kwargs):
+    conn = _orig_connect(*args, **kwargs)
+    if _ALLOW_DROP:
+        return conn
+
+    orig_execute = conn.execute
+    orig_executescript = conn.executescript
+
+    def safe_execute(sql, *a, **k):
+        if isinstance(sql, str) and _DANGEROUS.search(sql):
             raise RuntimeError("Comando SQL destrutivo bloqueado em produção.")
-        return super().execute(sql, *args, **kwargs)
+        return orig_execute(sql, *a, **k)
 
-    def executescript(self, script, *args, **kwargs):
-        if not _ALLOW_DROP and isinstance(script, str) and _DANGEROUS.search(script):
+    def safe_executescript(script, *a, **k):
+        if isinstance(script, str) and _DANGEROUS.search(script):
             raise RuntimeError("Script SQL destrutivo bloqueado em produção.")
-        return super().executescript(script, *args, **kwargs)
+        return orig_executescript(script, *a, **k)
 
-sqlite3.connect = lambda *a, **kw: GuardedConnection(*a, **kw)
+    conn.execute = safe_execute
+    conn.executescript = safe_executescript
+    return conn
+
+sqlite3.connect = _connect_guard
 
 # === SQL guard via Connection subclass (compatível com Python 3.11+) ===
 import re as _re
@@ -45,13 +57,11 @@ class GuardedConnection(sqlite3.Connection):
         if isinstance(sql, str) and _DANGEROUS.search(sql):
             raise RuntimeError("Comando SQL destrutivo bloqueado em produção.")
         return super().execute(sql, *a, **k)
-
     def executescript(self, script, *a, **k):
         if isinstance(script, str) and _DANGEROUS.search(script):
             raise RuntimeError("Script SQL destrutivo bloqueado em produção.")
         return super().executescript(script, *a, **k)
 
-# Monkeypatch leve: usa factory=GuardedConnection (não reatribui atributos read-only)
 _orig_connect = sqlite3.connect
 def _guarded_connect(*a, **k):
     k.setdefault("factory", GuardedConnection)
