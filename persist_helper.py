@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Ferramentas de persistência para Render.
-# - Garante /workspace/data
+# - Garante /var/data
 # - Define variáveis de ambiente padrão para SQLite
 # - Cria o arquivo do banco se não existir
 import os, pathlib

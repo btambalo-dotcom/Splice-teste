@@ -48,6 +48,7 @@ def _connect_guard(*args, **kwargs):
 
 sqlite3.connect = _connect_guard
 
+
 # === SQL guard via Connection subclass (compatível com Python 3.11+) ===
 import re as _re
 _DANGEROUS = _re.compile(r"\b(DROP\s+TABLE|DROP\s+SCHEMA|TRUNCATE|DELETE\s+FROM\s+\w+\s*;?)", _re.I)

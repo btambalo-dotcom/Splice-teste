@@ -1,15 +1,15 @@
 import os
 
-# === Persistência em /workspace/data (injeção automática) ===
+# === Persistência em /var/data (injeção automática) ===
 from persist_guard import DB_PATH  # ativa backup e bloqueio de DROP/TRUNCATE
-print(f"[BOOT] DATA_DIR={DATA_DIR} DB_FILE={DB_FILE} DB_PATH={DB_PATH}")
 try:
     import os, pathlib
     DATA_DIR = os.getenv("DATA_DIR", "/workspace/data")
     DB_FILE = os.getenv("DATABASE_FILE", "splice.db")
     DB_PATH = os.path.join(DATA_DIR, DB_FILE)
     os.makedirs(DATA_DIR, exist_ok=True)
-# Popular múltiplas convenções de variáveis de ambiente para frameworks comuns
+
+    # Popular múltiplas convenções de variáveis de ambiente para frameworks comuns
     db_url = f"sqlite:///{DB_PATH}"
     os.environ.setdefault("DATABASE_URL", db_url)                # Flask SQLAlchemy / genérico
     os.environ.setdefault("SQLALCHEMY_DATABASE_URI", db_url)     # Flask-SQLAlchemy
@@ -63,6 +63,11 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(WORKMAP_FOLDER, exist_ok=True)
 
 app = Flask(__name__)
+
+
+@app.route("/healthz")
+def healthz():
+    return "ok", 200
 UPLOAD_FOLDER = UPLOAD_FOLDER
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 max_len_mb = int(os.environ.get("MAX_CONTENT_LENGTH_MB", "20"))

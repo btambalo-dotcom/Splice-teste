@@ -15,8 +15,10 @@ services:
         value: troque-por-uma-senha-secreta
         type: SECRET
     routes:
-      - path: /healthzhealth_check:
+      - path: /
+    health_check:
       path: /healthz
+      initial_delay_seconds: 10
       period_seconds: 10
       timeout_seconds: 5
       failure_threshold: 6
