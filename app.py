@@ -2,15 +2,13 @@ import os
 
 # === Persistência em /var/data (injeção automática) ===
 from persist_guard import DB_PATH  # ativa backup e bloqueio de DROP/TRUNCATE
+print(f"[BOOT] DATA_DIR={DATA_DIR} DB_FILE={DB_FILE} DB_PATH={DB_PATH}")
 try:
     import os, pathlib
     DATA_DIR = os.getenv("DATA_DIR", "/workspace/data")
     DB_FILE = os.getenv("DATABASE_FILE", "splice.db")
     DB_PATH = os.path.join(DATA_DIR, DB_FILE)
     os.makedirs(DATA_DIR, exist_ok=True)
-
-    
-print(f"[BOOT] DATA_DIR={DATA_DIR} DB_FILE={DB_FILE} DB_PATH={DB_PATH}")
 # Popular múltiplas convenções de variáveis de ambiente para frameworks comuns
     db_url = f"sqlite:///{DB_PATH}"
     os.environ.setdefault("DATABASE_URL", db_url)                # Flask SQLAlchemy / genérico
