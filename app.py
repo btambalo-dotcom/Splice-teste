@@ -1,44 +1,25 @@
 import os
 
 # === Persistência em /var/data (injeção automática) ===
-from persist_guard import DB_PATH  # ativa backup e bloqueio de DROP/TRUNCATE
+
+# === Persist bootstrap (DO-compatible) ===
 try:
-    import os, pathlib
-    DATA_DIR = os.getenv("DATA_DIR", "/workspace/data")
-    DB_FILE = os.getenv("DATABASE_FILE", "splice.db")
-    DB_PATH = os.path.join(DATA_DIR, DB_FILE)
-    os.makedirs(DATA_DIR, exist_ok=True)
-
-    # Popular múltiplas convenções de variáveis de ambiente para frameworks comuns
-    db_url = f"sqlite:///{DB_PATH}"
-    os.environ.setdefault("DATABASE_URL", db_url)                # Flask SQLAlchemy / genérico
-    os.environ.setdefault("SQLALCHEMY_DATABASE_URI", db_url)     # Flask-SQLAlchemy
-    os.environ.setdefault("DB_PATH", DB_PATH)                    # Apps que usam caminho direto
-    os.environ.setdefault("DB_FILE", DB_FILE)
-    os.environ.setdefault("DATA_DIR", DATA_DIR)
-
-    # Flag para healthz
-    os.environ["SPLICE_PERSIST_READY"] = "1"
-except Exception as _e:  # Não quebrar o boot em caso de ambiente restrito
+    from persist_guard import DB_PATH, DATA_DIR, DB_FILE
+    import os as _os
+    _os.environ["SPLICE_PERSIST_READY"] = "1"
+except Exception as _e:
     _persist_inject_error = str(_e)
-# === Fim da injeção ===
+    # === DEBUG: imprimir variáveis de ambiente no boot ===
+    try:
+        for _k, _v in sorted(_os.environ.items()):
+            print(f"[ENV] {_k}={_v}")
+        if DATA_DIR.startswith("/var/data"):
+            print("[WARN] DATA_DIR está em /var/data (sem permissão na DO). Use /workspace/data.")
+        print(f"[BOOT] DATA_DIR={DATA_DIR} DB_FILE={DB_FILE} DB_PATH={DB_PATH}")
+    except Exception as _dbg_e:
+        print(f"[DEBUG-ERR] falha ao imprimir ENV: {_dbg_e}")
 
-
-from persist_helper import ensure_persist
-DATA_DIR, DATABASE_FILE, DB_PATH, DATABASE_URL = ensure_persist()
-# === FORCE PERSISTENCE ON RENDER DISK ===
-import os, pathlib
-DATA_DIR = os.getenv("DATA_DIR", "/workspace/data")
-pathlib.Path(DATA_DIR).mkdir(parents=True, exist_ok=True)
-DB_FILE = os.getenv("DATABASE_FILE", "splice.db")
-DB_PATH = os.path.join(DATA_DIR, DB_FILE)
-# Hard-override DATABASE_URL to avoid wrong envs
-os.environ["DATABASE_URL"] = f"sqlite:///{DB_PATH}"
-# ========================================
-# --- Persistence setup for Render Disk ---
-import os as _os
-PERSIST_DIR = _os.environ.get("PERSIST_DIR", "/workspace/data")
-_os.makedirs(PERSIST_DIR, exist_ok=True)
+s(PERSIST_DIR, exist_ok=True)
 DB_FILE = _os.path.join(PERSIST_DIR, "app.db")
 
 from flask import (
