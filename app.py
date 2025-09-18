@@ -1,6 +1,6 @@
 import os
 
-# === Persistência em /var/data (injeção automática) ===
+# === Persistência em /workspace/data (injeção automática) ===
 from persist_guard import DB_PATH  # ativa backup e bloqueio de DROP/TRUNCATE
 print(f"[BOOT] DATA_DIR={DATA_DIR} DB_FILE={DB_FILE} DB_PATH={DB_PATH}")
 try:
