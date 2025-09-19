@@ -4,42 +4,27 @@ from flask import Flask, request, redirect, url_for, render_template, flash, ses
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
-# ===== Persistência segura para DigitalOcean App Platform =====
-
-
-
-
-
-
-for _p in (DATA_DIR, UPLOAD_FOLDER, WORKMAP_FOLDER, BACKUP_DIR):
-    os.makedirs(_p, exist_ok=True)
-
-
+# === Persist bootstrap (DO-compatible) ===
+try:
+    import persist_guard  # aplica proteções no sqlite3.connect, se disponível
+except Exception as _e:
+    _persist_inject_error = str(_e)  # apenas logar, não impedir boot
 
 # ===== DigitalOcean Hardened Bootstrap =====
 def _choose_data_dir():
-    import os
-    import errno
     prefer = os.environ.get("DATA_DIR", "/var/data")
-    # Try to create the preferred dir
     try:
         os.makedirs(prefer, exist_ok=True)
-        # quick write test
         testf = os.path.join(prefer, ".write_test")
         with open(testf, "w") as _f:
             _f.write("ok")
         os.remove(testf)
         return prefer
-    except Exception as e:
-        # Fallback to /tmp/data
+    except Exception:
         fallback = "/tmp/data"
-        try:
-            os.makedirs(fallback, exist_ok=True)
-        except Exception:
-            pass
+        os.makedirs(fallback, exist_ok=True)
         return fallback
 
-# Normalize DATA_DIR and dependent paths
 DATA_DIR = _choose_data_dir()
 DB_FILE  = os.environ.get("DATABASE_FILE", "splice.db")
 DB_PATH  = os.environ.get("DB_PATH", os.path.join(DATA_DIR, DB_FILE))
@@ -47,16 +32,7 @@ UPLOAD_FOLDER  = os.environ.get("UPLOAD_FOLDER", os.path.join(DATA_DIR, "uploads
 WORKMAP_FOLDER = os.environ.get("WORKMAP_FOLDER", os.path.join(DATA_DIR, "workmaps"))
 BACKUP_DIR     = os.path.join(DATA_DIR, "backups")
 for _p in (DATA_DIR, UPLOAD_FOLDER, WORKMAP_FOLDER, BACKUP_DIR):
-    try:
-        os.makedirs(_p, exist_ok=True)
-    except Exception:
-        pass
-
-# Defensive import of persist_guard (opcional)
-try:
-    import persist_guard  # aplica proteções em sqlite3.connect, se disponível
-except Exception as _e:
-    _persist_inject_error = str(_e)
+    os.makedirs(_p, exist_ok=True)
 
 app = Flask(__name__)
 
@@ -77,13 +53,6 @@ def get_db():
         pass
     conn.row_factory = sqlite3.Row
     return conn
-
-
-import os, sqlite3
-from contextlib import closing
-from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
-
 # ===== Persistência segura para DigitalOcean App Platform =====
 DATA_DIR = os.environ.get('DATA_DIR', '/var/data')
 DB_FILE  = os.environ.get('DATABASE_FILE', 'splice.db')
