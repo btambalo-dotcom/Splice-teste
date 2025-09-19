@@ -68,7 +68,6 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
-)
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import os
@@ -154,6 +153,17 @@ def init_db():
         db.commit()
 
     # AUGMENTED: create default admin
+with closing(get_db()) as db:
+    cur = db.cursor()
+    row = cur.execute("SELECT id FROM users WHERE username=?", ("admin",)).fetchone()
+    if not row:
+        cur.execute(
+            "INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)",
+            ("admin", generate_password_hash("admin123"))
+        )
+        db.commit()
+
+# AUGMENTED:# AUGMENTED: create default admin
     with closing(get_db()) as db:
         cur = db.cursor()
         row = cur.execute("SELECT id FROM users WHERE username=?", ("admin",)).fetchone()
@@ -161,21 +171,8 @@ def init_db():
             cur.execute(
                 "INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)",
                 ("admin", generate_password_hash("admin123"))
-            )
-            db.commit()
-
-    
-
-    # AUGMENTED: create default admin
-    with closing(get_db()) as db:
-        cur = db.cursor()
-        row = cur.execute("SELECT id FROM users WHERE username=?", ("admin",)).fetchone()
-        if not row:
-            cur.execute(
-                "INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)",
-                ("admin", generate_password_hash("admin123"))
-            )
-            db.commit()
+        )
+        db.commit()
 
 
 
@@ -434,7 +431,6 @@ def new_record():
         saved_any = False
         from werkzeug.utils import secure_filename
         import os
-import sqlite3
         for f in files[:MAX_FILES_PER_RECORD]:
             fname = f.filename
             if not fname:
@@ -925,8 +921,8 @@ def admin_photos_zip():
         bio.getvalue(),
         mimetype="application/zip",
         headers={"Content-Disposition": f"attachment; filename={fname}"}
-    )
 
+    )
 # ===== Export do usuário (pessoal) =====
 @app.route("/export.csv")
 @login_required
@@ -1188,7 +1184,6 @@ def _fmt_dt(ts):
 def _debug_db():
     from flask import jsonify
     import os
-import sqlite3
     data_dir = os.getenv("DATA_DIR", "/workspace/data")
     db_file = os.getenv("DATABASE_FILE", "splice.db")
     db_path = os.path.join(data_dir, db_file)
