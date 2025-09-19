@@ -20,7 +20,7 @@ except Exception:
     pass
 
 # Guard against destructive SQL
-_DANGEROUS = re.compile(r"\b(DROP\s+TABLE|DROP\s+SCHEMA|TRUNCATE|DELETE\s+FROM\s+\w+\s*;?)", re.I)
+_DANGEROUS = re.compile(r'\b(DROP\s+TABLE|DROP\s+SCHEMA|TRUNCATE|DELETE\s+FROM\s+\w+\s*;?\s*$)', re.I)
 _ALLOW_DROP = os.getenv("ALLOW_DESTRUCTIVE_SQL", "0") == "1"
 _orig_connect = sqlite3.connect
 

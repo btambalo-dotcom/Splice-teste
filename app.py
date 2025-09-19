@@ -1,11 +1,24 @@
 import os
 
+# === Persistência segura (DO) ===
+DATA_DIR = os.environ.get('DATA_DIR', '/var/data')
+DB_FILE = os.environ.get('DATABASE_FILE', 'splice.db')
+DB_PATH = os.environ.get('DB_PATH', os.path.join(DATA_DIR, DB_FILE))
+UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(DATA_DIR, 'uploads'))
+WORKMAP_FOLDER = os.environ.get('WORKMAP_FOLDER', os.path.join(DATA_DIR, 'workmaps'))
+BACKUP_DIR = os.path.join(DATA_DIR, 'backups')
+for _p in (DATA_DIR, UPLOAD_FOLDER, WORKMAP_FOLDER, BACKUP_DIR):
+    os.makedirs(_p, exist_ok=True)
+
+import sqlite3
+
 # === Persistência em /var/data (injeção automática) ===
 
 # === Persist bootstrap (DO-compatible) ===
 try:
     from persist_guard import DB_PATH, DATA_DIR, DB_FILE
-    import os as _os
+    import os
+import sqlite3 as _os
     _os.environ["SPLICE_PERSIST_READY"] = "1"
 except Exception as _e:
     _persist_inject_error = str(_e)
@@ -18,8 +31,7 @@ except Exception as _e:
         print(f"[BOOT] DATA_DIR={DATA_DIR} DB_FILE={DB_FILE} DB_PATH={DB_PATH}")
     except Exception as _dbg_e:
         print(f"[DEBUG-ERR] falha ao imprimir ENV: {_dbg_e}")
-
-s(PERSIST_DIR, exist_ok=True)
+os.makedirs(PERSIST_DIR, exist_ok=True)
 DB_FILE = _os.path.join(PERSIST_DIR, "app.db")
 
 from flask import (
@@ -28,7 +40,8 @@ from flask import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-import os, sqlite3, csv, zipfile
+import os
+import sqlite3, sqlite3, csv, zipfile
 from contextlib import closing
 from io import StringIO, BytesIO
 
@@ -53,11 +66,14 @@ UPLOAD_FOLDER = UPLOAD_FOLDER
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 max_len_mb = int(os.environ.get("MAX_CONTENT_LENGTH_MB", "20"))
 app.config["MAX_CONTENT_LENGTH"] = max_len_mb * 1024 * 1024
-
-DB_PATH = os.path.join(BASE_DIR, "app.db")
-
+# DB_PATH unificado para DATA_DIR
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
+    try:
+        conn.execute('PRAGMA journal_mode=WAL;')
+        conn.execute('PRAGMA synchronous=NORMAL;')
+    except Exception:
+        pass
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -390,6 +406,7 @@ def new_record():
         saved_any = False
         from werkzeug.utils import secure_filename
         import os
+import sqlite3
         for f in files[:MAX_FILES_PER_RECORD]:
             fname = f.filename
             if not fname:
@@ -1143,6 +1160,7 @@ def _fmt_dt(ts):
 def _debug_db():
     from flask import jsonify
     import os
+import sqlite3
     data_dir = os.getenv("DATA_DIR", "/workspace/data")
     db_file = os.getenv("DATABASE_FILE", "splice.db")
     db_path = os.path.join(data_dir, db_file)
