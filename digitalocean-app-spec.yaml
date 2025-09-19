@@ -1,0 +1,31 @@
+name: splice-app
+region: nyc
+services:
+  - name: web
+    environment_slug: python
+    instance_size_slug: basic-xxs
+    http_port: 8080
+    run_command: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
+    routes:
+      - path: /
+    envs:
+      - key: SECRET_KEY
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+        value: change-me-in-dashboard
+      - key: DATA_DIR
+        scope: RUN_TIME
+        value: /var/data
+      - key: DATABASE_FILE
+        scope: RUN_TIME
+        value: splice.db
+    health_check:
+      path: /healthz
+      initial_delay_seconds: 15
+      period_seconds: 10
+      timeout_seconds: 5
+      failure_threshold: 6
+    volumes:
+      - name: app-data
+        mount_path: /var/data
+        size_gigabytes: 1
