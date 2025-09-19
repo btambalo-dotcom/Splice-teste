@@ -1241,3 +1241,4 @@ try:
     app.register_blueprint(monitor_bp)
 except Exception as _bp_e:
     pass
+    pass
