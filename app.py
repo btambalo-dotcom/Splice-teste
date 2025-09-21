@@ -92,7 +92,22 @@ def init_db():
             )
         db.commit()
 
-# ----------------------------- Auth helpers -------------------------------
+# --- inicializa banco já no import (compatível com Flask 3.x)
+try:
+    init_db()
+except Exception as e:
+    # Em ambientes somente leitura, ainda assim o app sobe e mostra /debug/env
+    pass
+
+# ------------------------------- Routes -----------------------------------
+@app.get("/healthz")
+def health():
+    return "ok", 200
+
+@app.get("/debug/env")
+def debug_env():
+    return jsonify({"DATA_DIR": DATA_DIR, "DB_PATH": DB_PATH})
+
 def current_user():
     uid = session.get("uid")
     if not uid:
@@ -120,19 +135,6 @@ def admin_required(fn):
             abort(403)
         return fn(*a, **kw)
     return _w
-
-# ------------------------------- Routes -----------------------------------
-@app.before_first_request
-def _boot():
-    init_db()
-
-@app.get("/healthz")
-def health():
-    return "ok", 200
-
-@app.get("/debug/env")
-def debug_env():
-    return jsonify({"DATA_DIR": DATA_DIR, "DB_PATH": DB_PATH})
 
 @app.get("/")
 @login_required
@@ -271,8 +273,10 @@ def upload_workmap():
 
 # --- Admin ---
 @app.get("/admin")
-@admin_required
 def admin_home():
+    u = current_user()
+    if not u or not u["is_admin"]:
+        abort(403)
     with closing(get_db()) as db:
         total_users  = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
         total_records= db.execute("SELECT COUNT(*) FROM records").fetchone()[0]
@@ -280,31 +284,39 @@ def admin_home():
     return render_template("admin_home.html", stats={"users": total_users, "records": total_records, "photos": total_photos})
 
 @app.get("/admin/users")
-@admin_required
 def admin_users():
+    u = current_user()
+    if not u or not u["is_admin"]:
+        abort(403)
     with closing(get_db()) as db:
         rows = db.execute("SELECT id, username, is_admin FROM users ORDER BY id DESC").fetchall()
     return render_template("admin_users.html", users=rows)
 
 @app.post("/admin/users/<int:uid>/toggle-admin")
-@admin_required
 def toggle_admin(uid):
+    u = current_user()
+    if not u or not u["is_admin"]:
+        abort(403)
     with closing(get_db()) as db:
-        u = db.execute("SELECT id, is_admin FROM users WHERE id=?", (uid,)).fetchone()
-        if not u: abort(404)
-        db.execute("UPDATE users SET is_admin=? WHERE id=?", (0 if u["is_admin"] else 1, uid))
+        u2 = db.execute("SELECT id, is_admin FROM users WHERE id=?", (uid,)).fetchone()
+        if not u2: abort(404)
+        db.execute("UPDATE users SET is_admin=? WHERE id=?", (0 if u2["is_admin"] else 1, uid))
         db.commit()
     return redirect(url_for("admin_users"))
 
 @app.get("/admin/photos")
-@admin_required
 def admin_photos():
+    u = current_user()
+    if not u or not u["is_admin"]:
+        abort(403)
     files = sorted(os.listdir(UPLOAD_FOLDER))
     return render_template("admin_photos.html", files=files)
 
 @app.get("/admin/records")
-@admin_required
 def admin_records():
+    u = current_user()
+    if not u or not u["is_admin"]:
+        abort(403)
     with closing(get_db()) as db:
         rows = db.execute(
             "SELECT r.id, r.title, r.created_at, u.username FROM records r JOIN users u ON u.id=r.user_id ORDER BY r.id DESC"
@@ -312,33 +324,38 @@ def admin_records():
     return render_template("admin_records.html", records=rows)
 
 @app.get("/admin/reports")
-@admin_required
 def admin_reports():
+    u = current_user()
+    if not u or not u["is_admin"]:
+        abort(403)
     # Exporta CSV simples de registros
     def gen():
-        yield "id,title,body,user,created_at\\n"
+        yield "id,title,body,user,created_at\n"
         with closing(get_db()) as db:
             cur = db.execute(
                 "SELECT r.id, r.title, r.body, u.username, r.created_at "
                 "FROM records r JOIN users u ON u.id=r.user_id ORDER BY r.id"
             )
             for row in cur:
-                # escapar vírgulas simples
                 def esc(s):
                     s = str(s).replace('"','""')
                     return f'"{s}"'
-                yield f"{row[0]},{esc(row[1])},{esc(row[2])},{esc(row[3])},{row[4]}\\n"
+                yield f"{row[0]},{esc(row[1])},{esc(row[2])},{esc(row[3])},{row[4]}\n"
     return Response(gen(), mimetype="text/csv", headers={"Content-Disposition":"attachment; filename=records.csv"})
 
 @app.get("/admin/backups")
-@admin_required
 def admin_backups():
-    files = sorted([f for f in os.listdir(BACKUP_DIR) if f.endswith(".zip")], reverse=True)
+    u = current_user()
+    if not u or not u["is_admin"]:
+        abort(403)
+    files = sorted([f for f in os.listdir(BACKUP_DIR) if f.endswith('.zip')], reverse=True)
     return render_template("admin_backups.html", backups=files)
 
 @app.post("/admin/backups/create")
-@admin_required
 def create_backup():
+    u = current_user()
+    if not u or not u["is_admin"]:
+        abort(403)
     import zipfile
     ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
     name = f"backup-{ts}.zip"
@@ -355,8 +372,10 @@ def create_backup():
     return redirect(url_for("admin_backups"))
 
 @app.get("/admin/backups/download/<path:name>")
-@admin_required
 def download_backup(name):
+    u = current_user()
+    if not u or not u["is_admin"]:
+        abort(403)
     return send_from_directory(BACKUP_DIR, name, as_attachment=True)
 
 # --------------------------------------------------------------------------
