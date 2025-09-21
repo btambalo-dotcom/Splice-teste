@@ -1,92 +1,53 @@
-import os, sqlite3
-from contextlib import closing
-from flask import Flask, request, redirect, url_for, render_template, flash, session, send_from_directory, abort, Response
-from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
-
-# === Persist bootstrap (DO-compatible) ===
-try:
-    import persist_guard  # aplica proteções no sqlite3.connect, se disponível
-except Exception as _e:
-    _persist_inject_error = str(_e)  # apenas logar, não impedir boot
-
-# ===== DigitalOcean Hardened Bootstrap =====
-def _choose_data_dir():
-    prefer = os.environ.get("DATA_DIR", "/var/data")
-    try:
-        os.makedirs(prefer, exist_ok=True)
-        testf = os.path.join(prefer, ".write_test")
-        with open(testf, "w") as _f:
-            _f.write("ok")
-        os.remove(testf)
-        return prefer
-    except Exception:
-        fallback = "/tmp/data"
-        os.makedirs(fallback, exist_ok=True)
-        return fallback
-
-DATA_DIR = _choose_data_dir()
-DB_FILE  = os.environ.get("DATABASE_FILE", "splice.db")
-DB_PATH  = os.environ.get("DB_PATH", os.path.join(DATA_DIR, DB_FILE))
-UPLOAD_FOLDER  = os.environ.get("UPLOAD_FOLDER", os.path.join(DATA_DIR, "uploads"))
-WORKMAP_FOLDER = os.environ.get("WORKMAP_FOLDER", os.path.join(DATA_DIR, "workmaps"))
-BACKUP_DIR     = os.path.join(DATA_DIR, "backups")
-for _p in (DATA_DIR, UPLOAD_FOLDER, WORKMAP_FOLDER, BACKUP_DIR):
-    os.makedirs(_p, exist_ok=True)
-
-app = Flask(__name__)
-
-@app.route('/healthz')
-def healthz():
-    return 'ok', 200
-
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
-max_len_mb = int(os.environ.get('MAX_CONTENT_LENGTH_MB', '20'))
-app.config['MAX_CONTENT_LENGTH'] = max_len_mb * 1024 * 1024
-
-def get_db():
-    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
-    try:
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA synchronous=NORMAL;")
-    except Exception:
-        pass
-    conn.row_factory = sqlite3.Row
-    return conn
-# ===== Persistência segura para DigitalOcean App Platform =====
-DATA_DIR = os.environ.get('DATA_DIR', '/var/data')
-DB_FILE  = os.environ.get('DATABASE_FILE', 'splice.db')
-DB_PATH  = os.environ.get('DB_PATH', os.path.join(DATA_DIR, DB_FILE))
-UPLOAD_FOLDER  = os.environ.get('UPLOAD_FOLDER', os.path.join(DATA_DIR, 'uploads'))
-WORKMAP_FOLDER = os.environ.get('WORKMAP_FOLDER', os.path.join(DATA_DIR, 'workmaps'))
-BACKUP_DIR     = os.path.join(DATA_DIR, 'backups')
-for _p in (DATA_DIR, UPLOAD_FOLDER, WORKMAP_FOLDER, BACKUP_DIR):
-    os.makedirs(_p, exist_ok=True)
-
-
-@app.route('/healthz')
-def healthz():
-    return 'ok', 200
-
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
-max_len_mb = int(os.environ.get('MAX_CONTENT_LENGTH_MB', '20'))
-app.config['MAX_CONTENT_LENGTH'] = max_len_mb * 1024 * 1024
-
-def get_db():
-    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
-    try:
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA synchronous=NORMAL;")
-    except Exception:
-        pass
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
 import os
-import sqlite3, sqlite3, csv, zipfile
+
+# === Persistência em /var/data (injeção automática) ===
+from persist_guard import DB_PATH  # ativa backup e bloqueio de DROP/TRUNCATE
+try:
+    import os, pathlib
+    DATA_DIR = os.getenv("DATA_DIR", "/var/data")
+    DB_FILE = os.getenv("DATABASE_FILE", "splice.db")
+    DB_PATH = os.path.join(DATA_DIR, DB_FILE)
+    os.makedirs(DATA_DIR, exist_ok=True)
+
+    # Popular múltiplas convenções de variáveis de ambiente para frameworks comuns
+    db_url = f"sqlite:///{DB_PATH}"
+    os.environ.setdefault("DATABASE_URL", db_url)                # Flask SQLAlchemy / genérico
+    os.environ.setdefault("SQLALCHEMY_DATABASE_URI", db_url)     # Flask-SQLAlchemy
+    os.environ.setdefault("DB_PATH", DB_PATH)                    # Apps que usam caminho direto
+    os.environ.setdefault("DB_FILE", DB_FILE)
+    os.environ.setdefault("DATA_DIR", DATA_DIR)
+
+    # Flag para healthz
+    os.environ["SPLICE_PERSIST_READY"] = "1"
+except Exception as _e:  # Não quebrar o boot em caso de ambiente restrito
+    _persist_inject_error = str(_e)
+# === Fim da injeção ===
+
+
+from persist_helper import ensure_persist
+DATA_DIR, DATABASE_FILE, DB_PATH, DATABASE_URL = ensure_persist()
+# === FORCE PERSISTENCE ON RENDER DISK ===
+import os, pathlib
+DATA_DIR = os.getenv("DATA_DIR", "/var/data")
+pathlib.Path(DATA_DIR).mkdir(parents=True, exist_ok=True)
+DB_FILE = os.getenv("DATABASE_FILE", "splice.db")
+DB_PATH = os.path.join(DATA_DIR, DB_FILE)
+# Hard-override DATABASE_URL to avoid wrong envs
+os.environ["DATABASE_URL"] = f"sqlite:///{DB_PATH}"
+# ========================================
+# --- Persistence setup for Render Disk ---
+import os as _os
+PERSIST_DIR = _os.environ.get("PERSIST_DIR", "/var/data")
+_os.makedirs(PERSIST_DIR, exist_ok=True)
+DB_FILE = _os.path.join(PERSIST_DIR, "app.db")
+
+from flask import (
+    Flask, render_template, request, redirect, url_for,
+    flash, session, send_from_directory, abort, Response
+)
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+import os, sqlite3, csv, zipfile
 from contextlib import closing
 from io import StringIO, BytesIO
 
@@ -101,21 +62,16 @@ MAX_FILES_PER_RECORD = 6
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(WORKMAP_FOLDER, exist_ok=True)
 
-
-
-
+app = Flask(__name__)
 UPLOAD_FOLDER = UPLOAD_FOLDER
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 max_len_mb = int(os.environ.get("MAX_CONTENT_LENGTH_MB", "20"))
 app.config["MAX_CONTENT_LENGTH"] = max_len_mb * 1024 * 1024
-# DB_PATH unificado para DATA_DIR
+
+DB_PATH = os.path.join(BASE_DIR, "app.db")
+
 def get_db():
-    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
-    try:
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA synchronous=NORMAL;")
-    except Exception:
-        pass
+    conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -168,17 +124,6 @@ def init_db():
         db.commit()
 
     # AUGMENTED: create default admin
-with closing(get_db()) as db:
-    cur = db.cursor()
-    row = cur.execute("SELECT id FROM users WHERE username=?", ("admin",)).fetchone()
-    if not row:
-        cur.execute(
-            "INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)",
-            ("admin", generate_password_hash("admin123"))
-        )
-        db.commit()
-
-# AUGMENTED:# AUGMENTED: create default admin
     with closing(get_db()) as db:
         cur = db.cursor()
         row = cur.execute("SELECT id FROM users WHERE username=?", ("admin",)).fetchone()
@@ -186,8 +131,21 @@ with closing(get_db()) as db:
             cur.execute(
                 "INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)",
                 ("admin", generate_password_hash("admin123"))
-        )
-        db.commit()
+            )
+            db.commit()
+
+    
+
+    # AUGMENTED: create default admin
+    with closing(get_db()) as db:
+        cur = db.cursor()
+        row = cur.execute("SELECT id FROM users WHERE username=?", ("admin",)).fetchone()
+        if not row:
+            cur.execute(
+                "INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)",
+                ("admin", generate_password_hash("admin123"))
+            )
+            db.commit()
 
 
 
@@ -936,8 +894,8 @@ def admin_photos_zip():
         bio.getvalue(),
         mimetype="application/zip",
         headers={"Content-Disposition": f"attachment; filename={fname}"}
-
     )
+
 # ===== Export do usuário (pessoal) =====
 @app.route("/export.csv")
 @login_required
@@ -1199,7 +1157,7 @@ def _fmt_dt(ts):
 def _debug_db():
     from flask import jsonify
     import os
-    data_dir = os.getenv("DATA_DIR", "/workspace/data")
+    data_dir = os.getenv("DATA_DIR", "/var/data")
     db_file = os.getenv("DATABASE_FILE", "splice.db")
     db_path = os.path.join(data_dir, db_file)
     try:
@@ -1240,5 +1198,4 @@ try:
     from monitor_bp import monitor_bp
     app.register_blueprint(monitor_bp)
 except Exception as _bp_e:
-    pass
     pass

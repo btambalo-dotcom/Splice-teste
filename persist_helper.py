@@ -5,7 +5,7 @@
 # - Cria o arquivo do banco se não existir
 import os, pathlib
 
-def ensure_persist(default_dir='/workspace/data', default_db='splice.db'):
+def ensure_persist(default_dir='/var/data', default_db='splice.db'):
     try:
         data_dir = os.getenv('DATA_DIR', default_dir)
         db_file = os.getenv('DATABASE_FILE', os.getenv('DB_FILE', default_db))
