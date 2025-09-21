@@ -1,1 +1,15 @@
-{% extends "base.html" %}{% block title %}Entrar{% endblock %}{% block content %}<div class="card"><h2>Entrar</h2><form method="post" action="{{ url_for('do_login') }}"><label>Usuário</label><input name="username" value="admin"><br><br><label>Senha</label><input type="password" name="password"><br><br><button class="btn">Entrar</button><a class="btn secondary" href="{{ url_for('register') }}">Cadastrar</a></form><p class="small">Se não lembrar a senha do admin, defina <code>ADMIN_PASSWORD_FORCE=1</code> e redeploy.</p></div>{% endblock %}
+{% extends "base.html" %}
+{% block title %}Entrar{% endblock %}
+{% block content %}
+<h1>Entrar</h1>
+<form method="post">
+  <label>Usuário</label>
+  <input type="text" name="username" required>
+  <label>Senha</label>
+  <input type="password" name="password" required>
+  <div style="margin-top:12px;">
+    <button class="btn" type="submit">Entrar</button>
+    <a class="btn secondary" href="{{ url_for('register') }}">Cadastrar</a>
+  </div>
+</form>
+{% endblock %}

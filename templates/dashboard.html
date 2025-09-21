@@ -1,1 +1,29 @@
-{% extends "base.html" %}{% block title %}Dashboard{% endblock %}{% block content %}<div class="card"><h2>Registros Recentes</h2><table><thead><tr><th>ID</th><th>Título</th><th>Autor</th><th>Criado</th><th></th></tr></thead><tbody>{% for r in records %}<tr><td>{{r.id}}</td><td>{{r.title}}</td><td class="small">{{r.username}}</td><td class="small">{{r.created_at}}</td><td><a class="btn" href="{{ url_for('view_record', record_id=r.id) }}">Abrir</a></td></tr>{% else %}<tr><td colspan="5" class="small">Nenhum registro.</td></tr>{% endfor %}</tbody></table></div><div class="card"><h2>Dispositivos</h2><table><thead><tr><th>ID</th><th>Nome</th><th>Serial</th><th>Lançado?</th><th>Criado</th><th></th></tr></thead><tbody>{% for d in devices %}<tr><td>{{d.id}}</td><td>{{d.name}}</td><td>{{d.serial}}</td><td>{{'Sim' if d.launched else 'Não'}}</td><td class="small">{{d.created_at}}</td><td>{% if current_user().is_admin %}<form method="post" action="{{ url_for('toggle_device', did=d.id) }}"><button class="btn">Alternar Lançado</button></form>{% endif %}</td></tr>{% else %}<tr><td colspan="6" class="small">Nenhum dispositivo.</td></tr>{% endfor %}</tbody></table></div>{% endblock %}
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1>Meus Registros</h1>
+<p>
+  <a class="btn" href="{{ url_for('new_record') }}">Novo Registro</a>
+  <a class="btn secondary" href="{{ url_for('export_csv') }}">Exportar CSV</a>
+</p>
+{% if records %}
+<table class="table">
+  <tr><th>Dispositivo</th><th>Fusões</th><th>Criado em</th><th>Ações</th></tr>
+  {% for r in records %}
+  <tr>
+    <td><a href="{{ url_for('view_record', record_id=r['id']) }}">{{ r['device_name'] }}</a></td>
+    <td>{{ r['fusion_count'] }}</td>
+    <td>{{ r['created_at'] }}</td>
+    <td>
+      <a class="btn secondary" href="{{ url_for('view_record', record_id=r['id']) }}">Abrir</a>
+      <form style="display:inline" method="post" action="{{ url_for('delete_record', record_id=r['id']) }}" onsubmit="return confirm('Apagar este registro?');">
+        <button class="btn secondary" type="submit">Apagar</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>Nenhum registro ainda.</p>
+{% endif %}
+{% endblock %}

@@ -1,11 +1,21 @@
-# Persistência de dados no Render
+# Persistência de banco no Render (Disk)
 
-- O disco persistente está montado em **/var/data**.
-- O banco SQLite fica em **/var/data/splice.db**.
-- Variáveis obrigatórias já estão configuradas no `render.yaml`:
-  - `DATA_DIR=/var/data`
-  - `DATABASE_FILE=splice.db`
-  - `WEB_CONCURRENCY=1`
-- Endpoints de verificação:
-  - `GET /healthz` → `{"ok": true, "checks": {"db":"ok","disk":"ok"}}`
-  - `GET /db.json` → JSON com as infos do SQLite.
+Este pacote foi ajustado para salvar o SQLite dentro do Disk do Render.
+
+## Como funciona
+- A aplicação monta `DATA_DIR` (padrão `/var/data`).
+- O arquivo do banco será `/var/data/splice.db` por padrão.
+- Você pode trocar o nome do arquivo do banco via variável `DATABASE_FILE` (ex: `DATABASE_FILE=mydata.db`).
+
+## Variáveis de Ambiente recomendadas
+- `DATA_DIR=/var/data`
+- `DATABASE_FILE=splice.db`  (opcional)
+- `WEB_CONCURRENCY=1`        (em serviços pequenos)
+- `SECRET_KEY=...`           (se sua app usa sessões)
+
+## Importante
+- **Não use** caminhos relativos dentro do container para o banco (como `sqlite:///splice.db`). Agora a app usa `DATABASE_URL` calculada dinamicamente:
+  `sqlite:////var/data/splice.db`
+
+## Arquivos modificados
+- ['/mnt/data/_build_persist/app.py']
