@@ -1,40 +1,22 @@
-# Splice Admin App — Final (Completo)
 
-Recursos principais:
-- Login/senha e papéis (admin/usuário)
-- Apenas o primeiro cadastro vira admin; depois só admin cria usuários
-- Admin: criar usuários, alternar admin, reset de senha
-- Registros: dispositivo, nº de fusões, até 6 fotos (png/jpg/jpeg/gif/webp)
-- Relatórios com filtros por datas/usuário, totais por dispositivo, totais por usuário
-- Gráficos (Chart.js) + export CSV/XLSX (com abas)
-- Download de fotos em ZIP por dispositivos filtrados
-- Rota de reset de admin com token (desativada por padrão)
+# Splice App — FULL (DigitalOcean App Platform)
 
-## Rodar local
-```bash
-pip install -r requirements.txt
-python app.py
-# http://localhost:5000
-```
-- Primeiro acesso: /register para criar o admin (se não houver usuários)
-- Depois: /login
+Aplicação Flask completa e funcional com:
+- Autenticação (registro/login, admin)
+- CRUD básico de registros + upload de fotos
+- Workmaps (upload/listagem)
+- Admin: usuários, registros, fotos, export CSV, backups zip
+- Persistência com **SQLite** em **/workspace/data** (monte um **Volume** aqui)
+- `Procfile` para Gunicorn, rota `/healthz`, rota `/debug/env`
 
-## Deploy Render
-- Start: `gunicorn app:app`
-- Build: `pip install -r requirements.txt`
-- Env Vars obrigatórias:
-    - `SECRET_KEY`
-    - `MAX_CONTENT_LENGTH_MB=20`
-- (opcionais de emergência):
-    - `FORCE_RESET_ADMIN=1`
-    - `RESET_ADMIN_TOKEN=seu_token`
-    - `NEW_ADMIN_PASSWORD=nova123`
-- Disk: monte `/opt/render/project/src/static/uploads`
+## Variáveis de ambiente
+- `SECRET_KEY` — gere um valor forte
+- `DATA_DIR` — `/workspace/data` (recomendado)
+- `DATABASE_FILE` — `splice.db` (opcional)
 
-## Rotas principais
-- `/register`, `/login`, `/logout`
-- `/` (dashboard), `/new`, `/record/<id>`, `/uploads/<arquivo>`
-- `/admin`, `/admin/users`, `/admin/records`
-- `/admin/reports`, `/admin/reports.csv`, `/admin/reports.xlsx`, `/admin/reports_users.csv`
-- `/admin/photos`, `/admin/photos.zip` (POST)
-- `/force_reset_admin?token=SEU_TOKEN` (se `FORCE_RESET_ADMIN=1`)
+## Deploy (DO App Platform)
+- **Run Command**: `gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120`
+- **Build Command**: deixe vazio
+- **Volume**: adicione um Volume montado em `/workspace/data`
+
+Credenciais iniciais: `admin / admin` (altere após login).
