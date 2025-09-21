@@ -4,14 +4,15 @@ from flask import Flask, request, redirect, url_for, render_template, flash, ses
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
-# ===== DigitalOcean Bootstrap (persistência segura) =====
+# === DigitalOcean-safe persistence bootstrap ===
 def _choose_data_dir():
     path = os.getenv("DATA_DIR", "/var/data")
     try:
         os.makedirs(path, exist_ok=True)
-        testf = os.path.join(path, ".write_test")
-        with open(testf, "w") as f: f.write("ok")
-        os.remove(testf)
+        # test write
+        with open(os.path.join(path, ".write_test"), "w") as f:
+            f.write("ok")
+        os.remove(os.path.join(path, ".write_test"))
     except Exception:
         path = "/tmp/splice-data"
         os.makedirs(path, exist_ok=True)
@@ -26,11 +27,6 @@ BACKUP_DIR     = os.path.join(DATA_DIR, "backups")
 for _p in (UPLOAD_FOLDER, WORKMAP_FOLDER, BACKUP_DIR):
     os.makedirs(_p, exist_ok=True)
 
-try:
-    import persist_guard
-except Exception as _e:
-    _persist_guard_err = str(_e)
-
 def get_db():
     conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
     try:
@@ -42,12 +38,9 @@ def get_db():
     return conn
 
 app = Flask(__name__)
-UPLOAD_FOLDER = UPLOAD_FOLDER
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 max_len_mb = int(os.environ.get("MAX_CONTENT_LENGTH_MB", "20"))
 app.config["MAX_CONTENT_LENGTH"] = max_len_mb * 1024 * 1024
-
-DB_PATH = os.path.join(BASE_DIR, "app.db")
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
