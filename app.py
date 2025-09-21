@@ -1,66 +1,45 @@
-import os
-
-# === Persistência em /var/data (injeção automática) ===
-from persist_guard import DB_PATH  # ativa backup e bloqueio de DROP/TRUNCATE
-try:
-    import os, pathlib
-    DATA_DIR = os.getenv("DATA_DIR", "/var/data")
-    DB_FILE = os.getenv("DATABASE_FILE", "splice.db")
-    DB_PATH = os.path.join(DATA_DIR, DB_FILE)
-    os.makedirs(DATA_DIR, exist_ok=True)
-
-    # Popular múltiplas convenções de variáveis de ambiente para frameworks comuns
-    db_url = f"sqlite:///{DB_PATH}"
-    os.environ.setdefault("DATABASE_URL", db_url)                # Flask SQLAlchemy / genérico
-    os.environ.setdefault("SQLALCHEMY_DATABASE_URI", db_url)     # Flask-SQLAlchemy
-    os.environ.setdefault("DB_PATH", DB_PATH)                    # Apps que usam caminho direto
-    os.environ.setdefault("DB_FILE", DB_FILE)
-    os.environ.setdefault("DATA_DIR", DATA_DIR)
-
-    # Flag para healthz
-    os.environ["SPLICE_PERSIST_READY"] = "1"
-except Exception as _e:  # Não quebrar o boot em caso de ambiente restrito
-    _persist_inject_error = str(_e)
-# === Fim da injeção ===
-
-
-from persist_helper import ensure_persist
-DATA_DIR, DATABASE_FILE, DB_PATH, DATABASE_URL = ensure_persist()
-# === FORCE PERSISTENCE ON RENDER DISK ===
-import os, pathlib
-DATA_DIR = os.getenv("DATA_DIR", "/var/data")
-pathlib.Path(DATA_DIR).mkdir(parents=True, exist_ok=True)
-DB_FILE = os.getenv("DATABASE_FILE", "splice.db")
-DB_PATH = os.path.join(DATA_DIR, DB_FILE)
-# Hard-override DATABASE_URL to avoid wrong envs
-os.environ["DATABASE_URL"] = f"sqlite:///{DB_PATH}"
-# ========================================
-# --- Persistence setup for Render Disk ---
-import os as _os
-PERSIST_DIR = _os.environ.get("PERSIST_DIR", "/var/data")
-_os.makedirs(PERSIST_DIR, exist_ok=True)
-DB_FILE = _os.path.join(PERSIST_DIR, "app.db")
-
-from flask import (
-    Flask, render_template, request, redirect, url_for,
-    flash, session, send_from_directory, abort, Response
-)
+import os, sqlite3
+from contextlib import closing
+from flask import Flask, request, redirect, url_for, render_template, flash, session, send_from_directory, abort, Response
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-import os, sqlite3, csv, zipfile
-from contextlib import closing
-from io import StringIO, BytesIO
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.environ.get("DATA_DIR", "/data")  # Persistente no Render Disk
-DB_PATH = os.environ.get("DB_PATH", os.path.join(DATA_DIR, "app.db"))
-UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", os.path.join(DATA_DIR, "uploads"))
-WORKMAP_FOLDER = os.environ.get("WORKMAP_FOLDER", os.path.join(DATA_DIR, "workmaps"))
-ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
-MAX_FILES_PER_RECORD = 6
+# ===== DigitalOcean Bootstrap (persistência segura) =====
+def _choose_data_dir():
+    path = os.getenv("DATA_DIR", "/var/data")
+    try:
+        os.makedirs(path, exist_ok=True)
+        testf = os.path.join(path, ".write_test")
+        with open(testf, "w") as f: f.write("ok")
+        os.remove(testf)
+    except Exception:
+        path = "/tmp/splice-data"
+        os.makedirs(path, exist_ok=True)
+    return path
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(WORKMAP_FOLDER, exist_ok=True)
+DATA_DIR = _choose_data_dir()
+DB_FILE  = os.getenv("DATABASE_FILE", "splice.db")
+DB_PATH  = os.getenv("DB_PATH", os.path.join(DATA_DIR, DB_FILE))
+UPLOAD_FOLDER  = os.getenv("UPLOAD_FOLDER", os.path.join(DATA_DIR, "uploads"))
+WORKMAP_FOLDER = os.getenv("WORKMAP_FOLDER", os.path.join(DATA_DIR, "workmaps"))
+BACKUP_DIR     = os.path.join(DATA_DIR, "backups")
+for _p in (UPLOAD_FOLDER, WORKMAP_FOLDER, BACKUP_DIR):
+    os.makedirs(_p, exist_ok=True)
+
+try:
+    import persist_guard
+except Exception as _e:
+    _persist_guard_err = str(_e)
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+    except Exception:
+        pass
+    conn.row_factory = sqlite3.Row
+    return conn
 
 app = Flask(__name__)
 UPLOAD_FOLDER = UPLOAD_FOLDER
