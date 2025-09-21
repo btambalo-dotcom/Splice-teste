@@ -64,6 +64,42 @@ except Exception as e:
 # === /AUTO_INIT_DO ===
 
 app = Flask(__name__)
+
+# ---- Context Processor: current_user disponível em todos os templates ----
+from types import SimpleNamespace
+import sqlite3
+from functools import wraps
+
+def _fetch_user_by_id(user_id: int):
+    try:
+        conn = sqlite3.connect(DB_PATH.as_posix())
+        cur = conn.cursor()
+        cur.execute("SELECT id, username, is_admin FROM users WHERE id = ?", (user_id,))
+        row = cur.fetchone()
+        conn.close()
+        if not row:
+            return None
+        return SimpleNamespace(id=row[0], username=row[1], is_admin=bool(row[2]))
+    except Exception as e:
+        # Em caso de erro, não quebra renderização de template
+        return None
+
+@app.context_processor
+def inject_current_user():
+    uid = session.get("uid")
+    user = _fetch_user_by_id(uid) if uid else None
+    return dict(current_user=user)
+
+# ---- Decorador para proteger rotas privadas ----
+def login_required(view):
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if not session.get("uid"):
+            flash("Faça login para continuar.", "warning")
+            return redirect(url_for("login"))
+        return view(*args, **kwargs)
+    return wrapper
+# --------------------------------------------------------------------------
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "CHANGE_ME")
 app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_CONTENT_LENGTH_MB", "50")) * 1024 * 1024
 
