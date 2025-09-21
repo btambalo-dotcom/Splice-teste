@@ -4,26 +4,24 @@ from flask import Flask, request, redirect, url_for, render_template, flash, ses
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
-# === DigitalOcean-safe persistence bootstrap ===
+# ===== DO Persistence Bootstrap (single-source-of-truth) =====
 def _choose_data_dir():
-    path = os.getenv("DATA_DIR", "/var/data")
+    path = os.getenv("DATA_DIR", "/workspace/data")
     try:
         os.makedirs(path, exist_ok=True)
-        # test write
-        with open(os.path.join(path, ".write_test"), "w") as f:
-            f.write("ok")
-        os.remove(os.path.join(path, ".write_test"))
+        _t = os.path.join(path, ".write_test")
+        with open(_t, "w") as f: f.write("ok")
+        os.remove(_t)
     except Exception:
         path = "/tmp/splice-data"
         os.makedirs(path, exist_ok=True)
     return path
 
-DATA_DIR = _choose_data_dir()
-DB_FILE  = os.getenv("DATABASE_FILE", "splice.db")
-DB_PATH  = os.getenv("DB_PATH", os.path.join(DATA_DIR, DB_FILE))
-UPLOAD_FOLDER  = os.getenv("UPLOAD_FOLDER", os.path.join(DATA_DIR, "uploads"))
-WORKMAP_FOLDER = os.getenv("WORKMAP_FOLDER", os.path.join(DATA_DIR, "workmaps"))
-BACKUP_DIR     = os.path.join(DATA_DIR, "backups")
+
+
+
+
+
 for _p in (UPLOAD_FOLDER, WORKMAP_FOLDER, BACKUP_DIR):
     os.makedirs(_p, exist_ok=True)
 
@@ -38,9 +36,11 @@ def get_db():
     return conn
 
 app = Flask(__name__)
+
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 max_len_mb = int(os.environ.get("MAX_CONTENT_LENGTH_MB", "20"))
 app.config["MAX_CONTENT_LENGTH"] = max_len_mb * 1024 * 1024
+
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -169,6 +169,7 @@ def is_writable(path):
         except Exception:
             pass
         return False
+
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
 def backup_db():
@@ -1127,7 +1128,7 @@ def _fmt_dt(ts):
 def _debug_db():
     from flask import jsonify
     import os
-    data_dir = os.getenv("DATA_DIR", "/var/data")
+    data_dir = os.getenv("DATA_DIR", DATA_DIR)
     db_file = os.getenv("DATABASE_FILE", "splice.db")
     db_path = os.path.join(data_dir, db_file)
     try:
