@@ -169,8 +169,6 @@ def is_writable(path):
         except Exception:
             pass
         return False
-
-BACKUP_DIR = os.path.join(DATA_DIR, "backups")
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
 def backup_db():
