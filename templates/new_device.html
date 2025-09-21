@@ -1,0 +1,1 @@
+{% extends "base.html" %}{% block title %}Novo Dispositivo{% endblock %}{% block content %}<div class="card"><h2>Novo Dispositivo</h2><form method="post" action="{{ url_for('create_device') }}"><label>Nome</label><input name="name"><br><br><label>Serial</label><input name="serial"><br><br><button class="btn">Salvar</button></form></div>{% endblock %}

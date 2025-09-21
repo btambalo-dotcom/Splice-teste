@@ -1,17 +1,1 @@
-{% extends "base.html" %}
-{% block title %}Meus Mapas de Trabalho{% endblock %}
-{% block content %}
-<h2>Meus Mapas de Trabalho</h2>
-{% if maps %}
-  <ul>
-    {% for m in maps %}
-      <li>
-        <strong>{{ m.title }}</strong> — 
-        <a href="{{ url_for('workmap_download', wm_id=m.id) }}">Baixar PDF</a>
-      </li>
-    {% endfor %}
-  </ul>
-{% else %}
-  <p>Nenhum mapa disponível para você ainda.</p>
-{% endif %}
-{% endblock %}
+{% extends "base.html" %}{% block title %}Workmaps{% endblock %}{% block content %}<div class="card"><h2>Workmaps</h2><form method="post" enctype="multipart/form-data" action="{{ url_for('upload_workmap') }}"><input type="file" name="file"> <button class="btn">Enviar</button></form></div><div class="card"><h3>Meus arquivos</h3><table><thead><tr><th>ID</th><th>Arquivo</th><th>Enviado</th><th></th></tr></thead><tbody>{% for f in files %}<tr><td>{{f.id}}</td><td><a href="{{ url_for('serve_workmap', name=f.filename) }}">{{ f.filename }}</a></td><td class="small">{{ f.uploaded_at }}</td><td><form method="post" action="{{ url_for('delete_workmap', w_id=f.id) }}"><button class="btn">Excluir</button></form></td></tr>{% else %}<tr><td colspan="4" class="small">Nenhum arquivo.</td></tr>{% endfor %}</tbody></table></div>{% endblock %}
