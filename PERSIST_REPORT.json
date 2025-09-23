@@ -1,0 +1,8 @@
+{
+  "main_app": "Splice-teste-main/app.py",
+  "patched_python_files": {
+    "Splice-teste-main/app.py": 1
+  },
+  "py_files_count": 2,
+  "html_files_count": 21
+}

@@ -1,18 +1,39 @@
+from flask import (
 
 # === PERSISTENCE_BOOTSTRAP (Render) ===
-import os
+import os, pathlib
 DATA_DIR = os.getenv("DATA_DIR", "/var/data")
 os.makedirs(DATA_DIR, exist_ok=True)
-
 DB_FILE = os.getenv("DATABASE_FILE", "splice.db")
 DB_PATH = os.path.join(DATA_DIR, DB_FILE)
-
-UPLOAD_FOLDER  = os.getenv("UPLOAD_FOLDER",  os.path.join(DATA_DIR, "uploads"))
-WORKMAP_FOLDER = os.getenv("WORKMAP_FOLDER", os.path.join(DATA_DIR, "workmaps"))
+UPLOAD_FOLDER  = os.getenv("UPLOAD_FOLDER",  os.path.join(DATA_DIR, UPLOAD_FOLDER))
+WORKMAP_FOLDER = os.getenv("WORKMAP_FOLDER", os.path.join(DATA_DIR, WORKMAP_FOLDER))
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(WORKMAP_FOLDER, exist_ok=True)
+
+# Symlinks de compatibilidade: se o código referir UPLOAD_FOLDER ou WORKMAP_FOLDER, redireciona ao disco
+try:
+    proj_root = os.path.abspath(os.path.dirname(__file__))
+    for name, target in [(UPLOAD_FOLDER, UPLOAD_FOLDER), (WORKMAP_FOLDER, WORKMAP_FOLDER)]:
+        link = os.path.join(proj_root, name)
+        if os.path.islink(link) or os.path.exists(link):
+            # se já existe dir UPLOAD_FOLDER normal, substitui por symlink
+            if os.path.isdir(link) and not os.path.islink(link):
+                try:
+                    # move conteúdo para o disco e remove a pasta antiga
+                    for f in os.listdir(link):
+                        src = os.path.join(link, f)
+                        dst = os.path.join(target, f)
+                        if os.path.isfile(src) and not os.path.exists(dst):
+                            try: pathlib.Path(dst).write_bytes(pathlib.Path(src).read_bytes())
+                            except Exception: pass
+                    import shutil; shutil.rmtree(link, ignore_errors=True)
+                except Exception: pass
+        if not os.path.exists(link):
+            os.symlink(target, link)
+except Exception:
+    pass
 # === end bootstrap ===
-from flask import (
     Flask, render_template, request, redirect, url_for,
     flash, session, send_from_directory, abort, Response
 )
@@ -25,8 +46,8 @@ from io import StringIO, BytesIO
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.environ.get("DATA_DIR", "/data")  # Persistente no Render Disk
 DB_PATH = os.environ.get("DB_PATH", os.path.join(DATA_DIR, "app.db"))
-UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", os.path.join(DATA_DIR, "uploads"))
-WORKMAP_FOLDER = os.environ.get("WORKMAP_FOLDER", os.path.join(DATA_DIR, "workmaps"))
+UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", os.path.join(DATA_DIR, UPLOAD_FOLDER))
+WORKMAP_FOLDER = os.environ.get("WORKMAP_FOLDER", os.path.join(DATA_DIR, WORKMAP_FOLDER))
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 MAX_FILES_PER_RECORD = 6
 
