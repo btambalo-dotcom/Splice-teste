@@ -1,24 +1,20 @@
-
 services:
   - type: web
-    name: splice-admin-app
+    name: splice-app
     env: python
-    plan: free
+    plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
     envVars:
       - key: SECRET_KEY
-        value: e6587411a188fb4641c417be4440ed00
+        generateValue: true
+      - key: DATA_DIR
+        value: /var/data
+      - key: DATABASE_FILE
+        value: splice.db
       - key: MAX_CONTENT_LENGTH_MB
         value: "20"
-      # Para reset de emergência, habilite e defina token/senha:
-      - key: FORCE_RESET_ADMIN
-        value: "0"
-      - key: RESET_ADMIN_TOKEN
-        value: 6b4eae01010216c7
-      - key: NEW_ADMIN_PASSWORD
-        value: nova123
-    disk:
-      name: uploads-disk
-      mountPath: /opt/render/project/src/static/uploads
-      sizeGB: 1
+    disks:
+      - name: data
+        mountPath: /var/data
+        sizeGB: 1
