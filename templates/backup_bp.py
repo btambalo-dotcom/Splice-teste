@@ -47,7 +47,8 @@ def upload():
     if not file or file.filename == "":
         flash("Selecione um arquivo de backup (.db, .sqlite, .sqlite3, .sql).", "warning")
         return redirect(url_for("backup_bp.index"))
-    if not allowed_ext(file.filename):
+    _, ext = os.path.splitext(file.filename.lower())
+    if ext not in ALLOWED_EXTENSIONS:
         flash("Extensão não permitida. Use .db, .sqlite, .sqlite3 ou .sql.", "danger")
         return redirect(url_for("backup_bp.index"))
     backup_folder = current_app.config.get("BACKUP_UPLOAD_FOLDER", os.path.join(current_app.root_path, "backups"))
@@ -71,10 +72,8 @@ def restore():
     if not os.path.exists(src):
         flash("Arquivo não encontrado.", "danger")
         return redirect(url_for("backup_bp.index"))
-
     db_path = get_db_path()
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
-
     safedir = os.path.join(backup_folder, "_auto_safety")
     os.makedirs(safedir, exist_ok=True)
     safety_copy = os.path.join(safedir, f"safety__{time.strftime('%Y%m%d-%H%M%S')}__{os.path.basename(db_path)}")
@@ -83,7 +82,6 @@ def restore():
             shutil.copy2(db_path, safety_copy)
         except Exception as e:
             current_app.logger.exception("Erro ao criar cópia de segurança: %s", e)
-
     _, ext = os.path.splitext(src.lower())
     try:
         if ext in {".db", ".sqlite", ".sqlite3"}:
@@ -104,7 +102,6 @@ def restore():
         current_app.logger.exception("Falha na restauração: %s", e)
         flash(f"Falha na restauração: {e}", "danger")
         return redirect(url_for("backup_bp.index"))
-
     flash("Restauração concluída com sucesso. Reinicie o serviço para aplicar totalmente.", "success")
     return redirect(url_for("backup_bp.index"))
 
