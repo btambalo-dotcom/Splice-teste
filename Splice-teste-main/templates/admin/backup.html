@@ -1,0 +1,41 @@
+
+{% extends "base.html" if "base.html" in globals() else "layout.html" %}
+{% block content %}
+<div class="container" style="max-width:900px">
+  <h2>Backup e Restauração</h2>
+  <p><strong>Banco atual:</strong> {{ db_path }}</p>
+
+  <h3>Enviar novo backup</h3>
+  <form method="post" action="{{ url_for('backup_bp.upload') }}" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".db,.sqlite,.sqlite3,.sql" required>
+    <button type="submit">Enviar</button>
+  </form>
+
+  <hr>
+  <h3>Backups disponíveis</h3>
+  {% if files %}
+  <form method="post" action="{{ url_for('backup_bp.restore') }}">
+    <table border="1" cellpadding="6" cellspacing="0">
+      <tr><th>Arquivo</th><th>Ações</th></tr>
+      {% for f in files %}
+      <tr>
+        <td>{{ f }}</td>
+        <td>
+          <label><input type="radio" name="chosen" value="{{ f }}"> Restaurar</label>
+          &nbsp;|&nbsp;
+          <a href="{{ url_for('backup_bp.download', filename=f) }}">Baixar</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    <p style="margin-top:10px;">
+      <button type="submit" onclick="return confirm('Tem certeza que deseja restaurar este backup? Isso substituirá o banco atual.')">
+        Restaurar selecionado
+      </button>
+    </p>
+  </form>
+  {% else %}
+    <p>Nenhum backup salvo.</p>
+  {% endif %}
+</div>
+{% endblock %}
