@@ -1,0 +1,61 @@
+
+{% extends "base.html" %}
+{% block content %}
+<div class="container" style="max-width:980px">
+  <h2>Backups</h2>
+
+  <p>
+    <a class="btn btn-primary" href="{{ url_for('backup_bp.create_full') }}">Criar backup completo (DB + arquivos)</a>
+    &nbsp;
+    <a class="btn btn-outline-primary" href="{{ url_for('backup_bp.create_backup') }}">Criar backup do DB</a>
+    &nbsp;
+    <a class="btn btn-secondary" href="/admin">Voltar ao Admin</a>
+  </p>
+
+  <h3>Enviar novo backup</h3>
+  <form method="post" action="{{ url_for('backup_bp.upload') }}" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".zip,.db,.sqlite,.sqlite3,.sql" required>
+    <button type="submit">Enviar</button>
+  </form>
+
+  <hr>
+  
+<div style="margin:10px 0; padding:8px 0;">
+  <a class="btn btn-primary" href="{{ url_for('backup_bp.create_full') }}">Criar backup completo (DB + arquivos)</a>
+  &nbsp;
+  <a class="btn btn-outline-primary" href="{{ url_for('backup_bp.create_backup') }}">Criar backup do DB</a>
+</div>
+<h3>Backups disponíveis</h3>
+
+  {% if files %}
+  <form method="post" action="{{ url_for('backup_bp.restore') }}">
+    <p>
+      <label>
+        <input type="checkbox" name="merge_files" value="1" checked>
+        Na restauração completa, mesclar arquivos (não apaga pastas inteiras)
+      </label>
+    </p>
+    <table border="1" cellpadding="6" cellspacing="0" style="width:100%">
+      <tr><th>Arquivo</th><th>Ações</th></tr>
+      {% for f in files %}
+      <tr>
+        <td>{{ f }}</td>
+        <td>
+          <label><input type="radio" name="chosen" value="{{ f }}"> Restaurar</label>
+          &nbsp;|&nbsp;
+          <a href="{{ url_for('backup_bp.download', filename=f) }}">Baixar</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    <p style="margin-top:10px;">
+      <button type="submit" onclick="return confirm('Será criado um backup de segurança ANTES de restaurar. Confirmar?')">
+        Restaurar selecionado
+      </button>
+    </p>
+  </form>
+  {% else %}
+    <p>Nenhum backup salvo.</p>
+  {% endif %}
+</div>
+{% endblock %}
