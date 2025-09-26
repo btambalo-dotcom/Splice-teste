@@ -1,7 +1,0 @@
-flask
-gunicorn
-werkzeug
-jinja2
-itsdangerous
-click
-blinker
